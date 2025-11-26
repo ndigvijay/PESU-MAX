@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Drawer, Box, IconButton, Typography } from '@mui/material';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { closeSidebar } from '../redux/sidebarSlice';
+import theme from '../Themes/theme';
 
 
 const Sidebar = () => {
@@ -17,6 +18,12 @@ const Sidebar = () => {
             anchor="right"
             open={isOpen}
             onClose={HandleClose}
+            hideBackdrop
+            slotProps={{
+                backdrop: {
+                    sx: { backgroundColor: 'transparent' }
+                }
+            }}
             sx={{
                 "& .MuiDrawer-paper": {
                     width: "400px",
@@ -38,8 +45,13 @@ const Sidebar = () => {
                         justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: "20px",
-                        borderBottom: "2px solid #FF6B35",
+                        borderBottom: `2px solid ${theme.colors.primary}`,
                         paddingBottom: "15px",
+                        // Stretch header to drawer edges by canceling parent padding
+                        marginLeft: "-20px",
+                        marginRight: "-20px",
+                        paddingLeft: 0,
+                        paddingRight: 0,
                     }}
                 >
                     <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>

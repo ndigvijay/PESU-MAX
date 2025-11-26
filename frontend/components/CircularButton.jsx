@@ -52,6 +52,7 @@ const CircularButton = () => {
           <IconButton
             onClick={handleClick}
             onMouseDown={handleMouseDown}
+            disableRipple
             sx={{
               position: "fixed",
               top: `${topPosition}px`,
@@ -68,13 +69,13 @@ const CircularButton = () => {
               alignItems: "center",
               justifyContent: "center",
               padding: 0,
-              cursor: "grab",
-              "&:hover": {
-                backgroundColor: "transparent",
-              },
-              "&:active": {
-                cursor: "grabbing",
-              },
+            //   cursor: "grab",
+            //   "&:hover": {
+            //     backgroundColor: "transparent",
+            //   },
+            //   "&:active": {
+            //     cursor: "grabbing",
+            //   },
             }}
           >
             <img
