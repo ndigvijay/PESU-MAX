@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "PESU-MAX",
+  "version": "1.0",
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "background/background.js"
+  },
+  "permissions": ["cookies", "storage"],
+  "host_permissions": ["https://*/*", "http://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content.js"]
+    }
+  ],
+  "icons": {
+    "128": "icons/Pes_logo_square.png"
+  }
+}
