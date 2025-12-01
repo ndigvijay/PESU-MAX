@@ -2,8 +2,8 @@ import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Drawer, Box, IconButton, Typography } from '@mui/material';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
-import { closeSidebar } from '../redux/sidebarSlice';
-import theme from '../Themes/theme';
+import { closeSidebar } from '../redux/sidebarSlice.js';
+import theme from '../Themes/theme.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 
 

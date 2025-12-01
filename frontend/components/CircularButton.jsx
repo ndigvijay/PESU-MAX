@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import IconButton from "@mui/material/IconButton";
-import { toggleSidebar } from "../redux/sidebarSlice";
-import theme from "../Themes/theme";
+import { toggleSidebar } from "../redux/sidebarSlice.js";
+import theme from "../Themes/theme.jsx";
 
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 

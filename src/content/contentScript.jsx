@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot} from 'react-dom/client';
-import App from '../../frontend/App';
+import App from '../../frontend/App.jsx';
 
 const container = document.createElement('div');
 container.id = 'pesu-max-root';

@@ -1,5 +1,5 @@
-import { getSubjectsCode, getStudentSemesters } from "../helpers/pesuAPI";
-import { parseSubjectsCode } from "../helpers/parser";
+import { getSubjectsCode, getAllSemesters } from "../helpers/pesuAPI.js";
+import { parseSubjectsCode } from "../helpers/parser.js";
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
@@ -18,16 +18,23 @@ function fetchAndStorePESUSessionId() {
 
 getSubjectsCode().then(data => {
   console.log(data);
-  const subjects = parseSubjectsCode(data);
-  console.log(subjects);
+  chrome.storage.local.set({ subjectsChunk: data });
+  // parseSubjectsCode(data);
+  console.log("subjects ---------");
+  // console.log(subjects);
 });
 
-
-getStudentSemesters().then(data => {
+getAllSemesters().then(data => {
   console.log(data);
+  chrome.storage.local.set({ semestersChunk: data });
 });
-// Example: trigger immediately when background loads
+
+
+//auth 
 fetchAndStorePESUSessionId();
+
+
+
 
 // Export if needed
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

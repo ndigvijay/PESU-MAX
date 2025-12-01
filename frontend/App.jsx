@@ -1,7 +1,7 @@
 import { Provider } from "react-redux";
-import { store } from "./redux/store";
-import Sidebar from "./components/SideBar";
-import CircularButton from "./components/CircularButton";
+import { store } from "./redux/store.jsx";
+import Sidebar from "./components/SideBar.jsx";
+import CircularButton from "./components/CircularButton.jsx";
 
 const App = () => {
     return ( 

@@ -32,8 +32,8 @@ export const getAllSemesters = async () => {
       }
     }
   );
-  const text = await response.text();
-  return text;
+  const data = await response.json();
+  return data;
 }
 
 
