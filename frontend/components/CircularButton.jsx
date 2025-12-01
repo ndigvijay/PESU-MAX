@@ -57,7 +57,7 @@ const CircularButton = () => {
               position: "fixed",
               top: `${topPosition}px`,
               right: isOpen ? "400px" : "20px",
-              transition: "right 0.3s ease-in-out",
+              transition: "right 0.3s ease-in-out, transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
               zIndex: 9999,
               width: "60px",
               height: "60px",
@@ -69,13 +69,14 @@ const CircularButton = () => {
               alignItems: "center",
               justifyContent: "center",
               padding: 0,
-            //   cursor: "grab",
-            //   "&:hover": {
-            //     backgroundColor: "transparent",
-            //   },
-            //   "&:active": {
-            //     cursor: "grabbing",
-            //   },
+              cursor: "pointer",
+              "&:hover": {
+                transform: "scale(1.15)",
+                boxShadow: `0 4px 12px rgba(0, 0, 0, 0.15)`,
+              },
+              "&:active": {
+                transform: "scale(1.1)",
+              },
             }}
           >
             <img

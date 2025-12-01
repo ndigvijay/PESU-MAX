@@ -4,6 +4,7 @@ import { Drawer, Box, IconButton, Typography } from '@mui/material';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { closeSidebar } from '../redux/sidebarSlice';
 import theme from '../Themes/theme';
+const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 
 
 const Sidebar = () => {
@@ -27,12 +28,19 @@ const Sidebar = () => {
             sx={{
                 "& .MuiDrawer-paper": {
                     width: "400px",
+                    borderTopLeftRadius: "32px",
+                    borderBottomLeftRadius: "32px",
+                    backgroundColor: "rgba(255, 255, 255, 0.85)",
+                    backdropFilter: "blur(5px)",
                 },
             }}
         >
             <Box
                 sx={{
-                    padding: "20px",
+                    paddingTop:"0px",
+                    paddingBottom:"5px",
+                    paddingLeft:"15px",
+                    paddingRight:"15px",
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
@@ -44,9 +52,6 @@ const Sidebar = () => {
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        marginBottom: "20px",
-                        borderBottom: `2px solid ${theme.colors.primary}`,
-                        paddingBottom: "15px",
                         // Stretch header to drawer edges by canceling parent padding
                         marginLeft: "-20px",
                         marginRight: "-20px",
@@ -54,11 +59,23 @@ const Sidebar = () => {
                         paddingRight: 0,
                     }}
                 >
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333' }}>
-                        PESU-MAX
-                    </Typography>
-                    <IconButton onClick={HandleClose} sx={{ color: '#333' }}>
-                        <ExitToAppIcon />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "4px" , padding: "4px 8px" }}>
+                        <img
+                            src={logoUrl}
+                            alt="PESU Logo"
+                            style={{
+                                width: "48px",
+                                height: "48px",
+                                borderRadius: "50%",
+                                pointerEvents: "none",
+                            }}
+                            />
+                        <Typography sx={{ fontWeight: 'bold', color: '#333', fontSize: '18px' }}>
+                            PESU-MAX
+                        </Typography>
+                    </Box>
+                    <IconButton onClick={HandleClose} size="large" sx={{ color: '#333' }}>
+                        <ExitToAppIcon fontSize="large" />
                     </IconButton>
                 </Box>
                 {/* content */}
