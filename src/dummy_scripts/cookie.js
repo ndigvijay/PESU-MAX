@@ -14,6 +14,12 @@ function fetchAndStorePESUSessionId() {
   );
 }
 
+
+// async function getSubjectCodes() {
+  
+  
+// }
+
 // Example: trigger immediately when background loads
 fetchAndStorePESUSessionId();
 

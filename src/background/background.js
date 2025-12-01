@@ -1,5 +1,5 @@
-
-
+import { getSubjectsCode, getStudentSemesters } from "../helpers/pesuAPI";
+import { parseSubjectsCode } from "../helpers/parser";
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
@@ -14,6 +14,18 @@ function fetchAndStorePESUSessionId() {
   );
 }
 
+// test call get subjects code
+
+getSubjectsCode().then(data => {
+  console.log(data);
+  const subjects = parseSubjectsCode(data);
+  console.log(subjects);
+});
+
+
+getStudentSemesters().then(data => {
+  console.log(data);
+});
 // Example: trigger immediately when background loads
 fetchAndStorePESUSessionId();
 
