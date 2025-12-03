@@ -1,11 +1,11 @@
-
+import { save } from "../utils/storage.js";
 
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
     (cookie) => {
       if (cookie) {
-        chrome.storage.local.set({ JSESSIONID: cookie.value });
+        save("JSESSIONID", cookie.value);
         console.log("Stored JSESSIONID:", cookie.value);
       } else {
         console.log("JSESSIONID cookie not found");

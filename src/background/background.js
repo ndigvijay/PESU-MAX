@@ -1,12 +1,13 @@
 import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile } from "../helpers/pesuAPI.js";
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode, getSubjectDetails } from "../helpers/enggSubjects.js";
+import { save } from "../utils/storage.js";
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
     (cookie) => {
       if (cookie) {
-        chrome.storage.local.set({ JSESSIONID: cookie.value });
+        save("JSESSIONID", cookie.value);
         console.log("Stored JSESSIONID:", cookie.value);
       } else {
         console.log("JSESSIONID cookie not found");
@@ -26,12 +27,11 @@ async function saveUserProfileData() {
 
     const profile = parseUserProfile(profileHtml);
     if (profile) {
-      chrome.storage.local.set({ userProfile: profile });
+      save("userProfile", profile);
       console.log("User profile saved:", profile);
     } else {
-      // If parsing fails, store raw HTML for debugging
       console.warn("Could not parse profile, storing raw data");
-      chrome.storage.local.set({ userProfileRaw: profileHtml });
+      save("userProfileRaw", profileHtml);
     }
   } catch (err) {
     console.error("Error fetching user profile:", err);
@@ -41,7 +41,6 @@ async function saveUserProfileData() {
 // Fetch and store all PESU data
 async function fetchAllPESUData() {
   try {
-    // Step 1: Get subjects
     const subjectsData = await getSubjectsCode();
     if (!subjectsData) {
       console.error("No subjects data received");
@@ -49,40 +48,46 @@ async function fetchAllPESUData() {
     }
     
     const subjects = parseSubjectsCode(subjectsData);
-    chrome.storage.local.set({ subjects: subjects });
-    
     const enggSubjects = await filterEnggSubjectsCode(subjects);
-    chrome.storage.local.set({ enggSubjects: enggSubjects });
     console.log(`Found ${enggSubjects.length} engineering subjects`);
 
-    // Step 2: Get course units for each engineering subject (sequentially to avoid rate limiting)
-    const courseUnits = {};
-    const unitClasses = {};
-
+    const subjectsMap = {};
+    
     for (const subject of enggSubjects) {
+      if (!subject.id) continue;
+      
+      subjectsMap[subject.id] = {
+        id: subject.id,
+        subjectCode: subject.subjectCode,
+        subjectName: subject.subjectName,
+        units: {}
+      };
+
       try {
-        if (!subject.id) continue;
-        
         const unitsData = await getCourseUnits(subject.id);
         if (!unitsData) continue;
         
         const units = parseCourseUnits(unitsData);
         if (units.length === 0) continue;
         
-        courseUnits[subject.id] = units;
         console.log(`Subject ${subject.subjectCode}: ${units.length} units`);
 
-        // Step 3: Get classes for each unit
         for (const unit of units) {
+          if (!unit.id) continue;
+          
+          subjectsMap[subject.id].units[unit.id] = {
+            id: unit.id,
+            name: unit.name,
+            classes: []
+          };
+
           try {
-            if (!unit.id) continue;
-            
             const classesData = await getUnitClasses(unit.id);
             if (!classesData) continue;
             
             const classes = parseUnitClasses(classesData);
             if (classes.length > 0) {
-              unitClasses[unit.id] = classes;
+              subjectsMap[subject.id].units[unit.id].classes = classes;
             }
           } catch (err) {
             console.error(`Error fetching classes for unit ${unit.id}:`, err);
@@ -93,9 +98,11 @@ async function fetchAllPESUData() {
       }
     }
 
-    // Store all data at once
-    chrome.storage.local.set({ courseUnits: courseUnits });
-    chrome.storage.local.set({ unitClasses: unitClasses });
+    save("pesuData", {
+      subjects: subjectsMap,
+      allSubjects: subjects,
+      fetchedAt: Date.now()
+    });
     console.log("PESU data fetch complete");
 
   } catch (err) {
@@ -108,7 +115,7 @@ async function fetchSemesters() {
     const data = await getAllSemesters();
     if (data) {
       const semesterData = parseSemesters(data);
-      chrome.storage.local.set({ semestersData: semesterData });
+      save("semestersData", semesterData);
       console.log(`Found ${semesterData.length} semesters`);
     }
   } catch (err) {

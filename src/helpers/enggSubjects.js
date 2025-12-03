@@ -1,7 +1,8 @@
 import { getYearofStudent } from "./parser.js";
+import { load } from "../utils/storage.js";
 
 export const filterEnggSubjectsCode = async (subjectsArray) => {
-    const { userProfile } = await chrome.storage.local.get('userProfile');
+    const userProfile = await load('userProfile');
     
     if (!userProfile) {
         return [];
