@@ -2,6 +2,7 @@ import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUs
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode, getSubjectDetails } from "../helpers/enggSubjects.js";
 import { save, load } from "../utils/storage.js";
+import { getPESUDataPagination } from "../helpers/getStorageData.js";
 
 // get auth cookie
 function fetchAndStorePESUSessionId() {
@@ -140,13 +141,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true; 
   }
+
+  if (request.action === "getPESUDataPagination") {
+    getPESUDataPagination(request)
+      .then((result) => {
+        sendResponse({ data: result });
+      })
+      .catch((error) => {
+        sendResponse({ error: error.message });
+      });
+    
+    return true;
+  }
 });
 
 // Run fetches
-fetchAndStorePESUSessionId();
-saveUserProfileData();
-fetchSemesters();
-fetchAllPESUData();
+// fetchAndStorePESUSessionId();
+// saveUserProfileData();
+// fetchSemesters();
+// fetchAllPESUData();
 
 
 
