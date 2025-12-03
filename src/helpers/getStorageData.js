@@ -1,5 +1,36 @@
 import { load } from "../utils/storage.js";
 
+function getSemester(code) {
+  if (!code) return null;
+  
+
+  const numMatch = code.match(/(\d{3})/);
+  if (!numMatch) return null;
+  
+  const number = numMatch[1]; 
+  const group = parseInt(number[0]); 
+  
+  const after = code.split(number)[1];
+  if (!after) return null;
+  
+  const sectionMatch = after.match(/[A-Z]/);
+  if (!sectionMatch) return null;
+  
+  const section = sectionMatch[0]; 
+  
+  const baseSemester = (group - 1) * 2 + 1;
+  return section === "A" ? baseSemester : baseSemester + 1;
+}
+
+function filterBySemester(subjects, semester) {
+  if (!semester || semester === "all") {
+    return subjects;
+  }
+  
+  const semesterNum = parseInt(semester);
+  return subjects.filter(subject => getSemester(subject.subjectCode) === semesterNum);
+}
+
 // Pagination and search helper
 function paginateAndSearch(items, { search = "", page = 0, limit = 10, searchFields = [] }) {
   let filtered = items;
@@ -63,7 +94,7 @@ function filterNestedData(subjects, search) {
 }
 
 // Main function to get paginated PESU data
-export async function getPESUDataPagination({ type, search = "", page = 0, limit = 10, subjectId, unitId }) {
+export async function getPESUDataPagination({ type, search = "", page = 0, limit = 10, subjectId, unitId, semester }) {
   const data = await load("pesuData");
   
   if (!data) {
@@ -74,12 +105,16 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
 
   if (type === "subjects") {
     // Get all subjects as array
-    const subjectsArray = Object.values(data.subjects || {}).map(subject => ({
+    let subjectsArray = Object.values(data.subjects || {}).map(subject => ({
       id: subject.id,
       subjectCode: subject.subjectCode,
       subjectName: subject.subjectName,
-      unitCount: Object.keys(subject.units || {}).length
+      unitCount: Object.keys(subject.units || {}).length,
+      semester: getSemester(subject.subjectCode)
     }));
+    
+    // Filter by semester
+    subjectsArray = filterBySemester(subjectsArray, semester);
     
     result = paginateAndSearch(subjectsArray, {
       search,
@@ -179,10 +214,11 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
   } 
   else if (type === "nested" || !type) {
     // Return full nested structure for table display
-    const subjectsArray = Object.values(data.subjects || {}).map(subject => ({
+    let subjectsArray = Object.values(data.subjects || {}).map(subject => ({
       id: subject.id,
       subjectCode: subject.subjectCode,
       subjectName: subject.subjectName,
+      semester: getSemester(subject.subjectCode),
       units: Object.values(subject.units || {}).map(unit => ({
         id: unit.id,
         name: unit.name,
@@ -194,8 +230,19 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
       }))
     }));
     
+    subjectsArray = subjectsArray.filter(subject => 
+      subject.units && subject.units.length > 0
+    );
+    
+    // Filter by semester first
+    subjectsArray = filterBySemester(subjectsArray, semester);
+    
     // Filter if search provided
-    const filtered = filterNestedData(subjectsArray, search);
+    let filtered = filterNestedData(subjectsArray, search);
+    
+    filtered = filtered.filter(subject => 
+      subject.units && subject.units.length > 0
+    );
     
     // Paginate subjects
     const total = filtered.length;

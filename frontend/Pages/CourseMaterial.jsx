@@ -14,7 +14,10 @@ import {
   TextField, 
   InputAdornment,
   TablePagination,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  Select,
+  MenuItem
 } from "@mui/material";
 import { useDispatch } from "react-redux";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
@@ -24,11 +27,25 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import SearchIcon from '@mui/icons-material/Search';
 import theme from "../Themes/theme.jsx";
 
+const SEMESTERS = [
+  { value: "all", label: "All Semesters" },
+  { value: "1", label: "Semester 1" },
+  { value: "2", label: "Semester 2" },
+  { value: "3", label: "Semester 3" },
+  { value: "4", label: "Semester 4" },
+  { value: "5", label: "Semester 5" },
+  { value: "6", label: "Semester 6" },
+  { value: "7", label: "Semester 7" },
+  { value: "8", label: "Semester 8" }
+];
+
 const CourseMaterial = () => {
   const dispatch = useDispatch();
   const [pesuData, setPesuData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // Input field value
+  const [search, setSearch] = useState(""); // Actual search query sent to API
+  const [semester, setSemester] = useState("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   
@@ -48,6 +65,7 @@ const CourseMaterial = () => {
       action: "getPESUDataPagination",
       type: "nested",
       search: search,
+      semester: semester,
       page: page,
       limit: rowsPerPage
     }, (response) => {
@@ -67,14 +85,29 @@ const CourseMaterial = () => {
 
   useEffect(() => {
     fetchData();
-  }, [page, rowsPerPage, search]);
+  }, [page, rowsPerPage, search, semester]);
 
   const HandleBack = () => {
     dispatch(setCurrentPage("home"));
   };
 
   const HandleSearchChange = (event) => {
-    setSearch(event.target.value);
+    setSearchInput(event.target.value);
+  };
+
+  const HandleSearchSubmit = () => {
+    setSearch(searchInput);
+    setPage(0);
+  };
+
+  const HandleSearchKeyPress = (event) => {
+    if (event.key === 'Enter') {
+      HandleSearchSubmit();
+    }
+  };
+
+  const HandleSemesterChange = (event) => {
+    setSemester(event.target.value);
     setPage(0);
   };
 
@@ -266,35 +299,81 @@ const CourseMaterial = () => {
         </Typography>
       </Box>
 
-      {/* Search */}
-      <TextField
-        size="small"
-        placeholder="Search subjects, units, or classes..."
-        value={search}
-        onChange={HandleSearchChange}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon sx={{ color: theme.colors.secondary, fontSize: '20px' }} />
-            </InputAdornment>
-          ),
-        }}
-        sx={{
-          '& .MuiOutlinedInput-root': {
-            borderRadius: '8px',
-            fontSize: '13px',
-            '& fieldset': {
-              borderColor: theme.colors.secondaryLight
-            },
-            '&:hover fieldset': {
-              borderColor: theme.colors.secondary
-            },
-            '&.Mui-focused fieldset': {
-              borderColor: theme.colors.primary
+      {/* Search and Semester Filter */}
+      <Box sx={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="Search subjects, units, or classes..."
+          value={searchInput}
+          onChange={HandleSearchChange}
+          onKeyPress={HandleSearchKeyPress}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: theme.colors.secondary, fontSize: '20px' }} />
+              </InputAdornment>
+            ),
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  onClick={HandleSearchSubmit}
+                  sx={{
+                    padding: '4px',
+                    color: theme.colors.primary,
+                    '&:hover': {
+                      backgroundColor: 'rgba(245, 130, 31, 0.1)'
+                    }
+                  }}
+                >
+                  <SearchIcon sx={{ fontSize: '18px' }} />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            flex: 1,
+            '& .MuiOutlinedInput-root': {
+              borderRadius: '8px',
+              fontSize: '13px',
+              '& fieldset': {
+                borderColor: theme.colors.secondaryLight
+              },
+              '&:hover fieldset': {
+                borderColor: theme.colors.secondary
+              },
+              '&.Mui-focused fieldset': {
+                borderColor: theme.colors.primary
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <Select
+            value={semester}
+            onChange={HandleSemesterChange}
+            sx={{
+              borderRadius: '8px',
+              fontSize: '13px',
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.colors.secondaryLight
+              },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.colors.secondary
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.colors.primary
+              }
+            }}
+          >
+            {SEMESTERS.map((sem) => (
+              <MenuItem key={sem.value} value={sem.value} sx={{ fontSize: '13px' }}>
+                {sem.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       {/* Table */}
       {loading ? (
