@@ -5,6 +5,7 @@ import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { closeSidebar } from '../redux/sidebarSlice.js';
 import theme from '../Themes/theme.jsx';
 import Home from '../Pages/Home.jsx';
+import CourseMaterial from '../Pages/CourseMaterial.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 
 
@@ -89,6 +90,7 @@ const Sidebar = () => {
                 />
                 {/* content */}
                 {currentPage === "home" && <Home />}
+                {currentPage === "courseMaterial" && <CourseMaterial />}
                 {/* {currentPage === "attendence" && <Attendence />}
                 {currentPage === "GPA" && <Grades />} */}
 

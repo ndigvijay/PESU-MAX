@@ -1,7 +1,7 @@
 import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile } from "../helpers/pesuAPI.js";
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode, getSubjectDetails } from "../helpers/enggSubjects.js";
-import { save } from "../utils/storage.js";
+import { save, load } from "../utils/storage.js";
 
 // get auth cookie
 function fetchAndStorePESUSessionId() {
@@ -124,6 +124,23 @@ async function fetchSemesters() {
     console.error("Error fetching semesters:", err);
   }
 }
+
+
+// get from storage and send to frontend
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === "getPESUData") {
+    load("pesuData").then((data) => {
+      sendResponse({
+        data: data
+      });
+    }).catch((error) => {
+      sendResponse({
+        error: error.message
+      });
+    });
+    return true; 
+  }
+});
 
 // Run fetches
 fetchAndStorePESUSessionId();

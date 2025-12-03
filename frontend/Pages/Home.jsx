@@ -1,7 +1,11 @@
 import React from "react";
 import { Box, Typography, Button } from "@mui/material";
-import theme from "../Themes/theme";
+import { useDispatch } from "react-redux";
+import { setCurrentPage } from "../redux/sidebarSlice.js";
+import theme from "../Themes/theme.jsx";
+
 const Home = () => {
+  const dispatch = useDispatch();
   return ( 
     <Box>
         <Box sx={{ 
@@ -19,6 +23,7 @@ const Home = () => {
               padding: '12px'
             }}
             onClick={() => {
+              dispatch(setCurrentPage("courseMaterial"));
             }}
           >
             Download All Course Materials
