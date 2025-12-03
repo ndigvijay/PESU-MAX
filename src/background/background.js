@@ -2,6 +2,8 @@ import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUs
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode, getSubjectDetails } from "../helpers/enggSubjects.js";
 import { save } from "../utils/storage.js";
+
+// get auth cookie
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
@@ -132,10 +134,3 @@ fetchAllPESUData();
 
 
 
-// Export if needed
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.action === "FETCH_SESSION") {
-    fetchAndStorePESUSessionId();
-    sendResponse({ status: "ok" });
-  }
-});

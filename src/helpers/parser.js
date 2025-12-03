@@ -1,7 +1,6 @@
 import * as cheerio from 'cheerio';
 import { load } from 'cheerio';
 
-// Helper to clean IDs (remove escaped quotes and backslashes)
 const cleanId = (id) => {
   if (!id) return '';
   return id.trim()
@@ -55,10 +54,8 @@ export const parseSemesters = (optionsString) => {
   return results;
 };
 
-// Step 2: Parse Course Units
-// Response is JSON-encoded HTML with <option> tags
+
 export const parseCourseUnits = (data) => {
-  // Handle null/empty data
   if (!data || (typeof data === 'string' && !data.trim())) {
     return [];
   }
@@ -71,7 +68,6 @@ export const parseCourseUnits = (data) => {
     const unit_name = $(element).text().trim();
     
     if (unit_id && unit_name) {
-      // Extract unit number (before colon, e.g., "Unit 1" from "Unit 1: Introduction")
       const unitNumber = unit_name.includes(':') 
         ? unit_name.split(':')[0].trim() 
         : unit_name;
@@ -87,10 +83,7 @@ export const parseCourseUnits = (data) => {
   return units;
 };
 
-// Step 3: Parse Unit Classes
-// Response is JSON-encoded HTML with <option> tags
 export const parseUnitClasses = (data) => {
-  // Handle null/empty data
   if (!data || (typeof data === 'string' && !data.trim())) {
     return [];
   }
@@ -106,7 +99,7 @@ export const parseUnitClasses = (data) => {
       classes.push({
         id: cleanId(class_id),
         className: class_name,
-        classType: 'Lecture' // Default type
+        classType: 'Lecture' 
       });
     }
   });
@@ -114,12 +107,10 @@ export const parseUnitClasses = (data) => {
   return classes;
 };
 
-// Step 4: Parse Download Links from HTML response
 export const parseDownloadLinks = (htmlData) => {
   const $ = load(htmlData);
   const downloadLinks = [];
 
-  // Pattern 1: onclick="downloadcoursedoc('ID')"
   $('[onclick*="downloadcoursedoc"]').each((index, element) => {
     const onclick = $(element).attr('onclick') || '';
     const match = onclick.match(/downloadcoursedoc\('([^']+)'/);
@@ -132,13 +123,12 @@ export const parseDownloadLinks = (htmlData) => {
     }
   });
 
-  // Pattern 2: onclick="loadIframe('/Academy/...')" for slides
   $('[onclick*="loadIframe"]').each((index, element) => {
     const onclick = $(element).attr('onclick') || '';
     if (onclick.includes('downloadslidecoursedoc')) {
       const match = onclick.match(/loadIframe\('([^']+)'/);
       if (match) {
-        const url = match[1].split('#')[0]; // Remove fragments
+        const url = match[1].split('#')[0]; 
         downloadLinks.push({
           url: url,
           type: 'slidecoursedoc'
@@ -147,12 +137,11 @@ export const parseDownloadLinks = (htmlData) => {
     }
   });
 
-  // Pattern 3: Direct href attributes
   $('a[href*="referenceMeterials"], a[href*="download"]').each((index, element) => {
     const href = $(element).attr('href') || '';
     if (href.includes('downloadslidecoursedoc') || href.includes('downloadcoursedoc')) {
       downloadLinks.push({
-        url: href.split('#')[0], // Remove fragments
+        url: href.split('#')[0], 
         type: 'direct'
       });
     }
@@ -161,7 +150,6 @@ export const parseDownloadLinks = (htmlData) => {
   return downloadLinks;
 };
 
-// Resolve relative URLs to full URLs
 export const resolveDownloadUrl = (url) => {
   const BASE_URL = 'https://www.pesuacademy.com';
   
@@ -174,7 +162,6 @@ export const resolveDownloadUrl = (url) => {
   }
 };
 
-// Mapping of PESU Academy profile page headers to keys
 const PROFILE_HEADER_TO_KEY = {
   "Name": "name",
   "PRN": "prn",
@@ -185,8 +172,6 @@ const PROFILE_HEADER_TO_KEY = {
   "Section": "section",
 };
 
-// Parse user profile data from HTML response
-// Structure: div.elem-info-wrapper > div.form-group > label.lbl-title-light + label (value)
 export const parseUserProfile = (htmlData) => {
   if (!htmlData || (typeof htmlData === 'string' && !htmlData.trim())) {
     return null;
@@ -195,7 +180,6 @@ export const parseUserProfile = (htmlData) => {
   const $ = load(htmlData);
   const profile = {};
 
-  // Find the profile container and extract form groups
   const detailsContainer = $('div.elem-info-wrapper');
   if (detailsContainer.length === 0) {
     console.warn("Profile container (div.elem-info-wrapper) not found");
@@ -207,18 +191,14 @@ export const parseUserProfile = (htmlData) => {
     console.warn(`Expected at least 7 form groups, found ${formGroups.length}`);
   }
 
-  // Extract profile fields from form groups
   formGroups.each((index, group) => {
-    // Key is in label.lbl-title-light
     const keyLabel = $(group).find('label.lbl-title-light').first();
     const key = keyLabel.text().trim();
     
-    // Value is in the adjacent sibling label (next label after lbl-title-light)
     const valueLabel = keyLabel.next('label');
     const value = valueLabel.text().trim();
 
     if (key && value) {
-      // Map to our key names
       const mappedKey = PROFILE_HEADER_TO_KEY[key];
       if (mappedKey) {
         profile[mappedKey] = value;
@@ -226,7 +206,6 @@ export const parseUserProfile = (htmlData) => {
     }
   });
 
-  // Extract email from #updateMail input
   const emailInput = $('#updateMail');
   if (emailInput.length > 0) {
     const email = emailInput.attr('value') || emailInput.val();
@@ -235,7 +214,6 @@ export const parseUserProfile = (htmlData) => {
     }
   }
 
-  // Extract phone from #updateContact input
   const phoneInput = $('#updateContact');
   if (phoneInput.length > 0) {
     const phone = phoneInput.attr('value') || phoneInput.val();
@@ -244,7 +222,6 @@ export const parseUserProfile = (htmlData) => {
     }
   }
 
-  // Derive campus from PRN (PES1 = RR, PES2 = EC)
   if (profile.prn) {
     const campusMatch = profile.prn.match(/^PES(\d)/);
     if (campusMatch) {

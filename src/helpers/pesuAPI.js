@@ -1,26 +1,5 @@
 const BASE_URL = "https://www.pesuacademy.com/Academy";
 
-
-
-
-// curl 'https://www.pesuacademy.com/Academy/a/studentProfilePESU/getStudentSemestersPESU?_=1764590648945' \
-//   -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:145.0) Gecko/20100101 Firefox/145.0' \
-//   -H 'Accept: */*' \
-//   -H 'Accept-Language: en-US,en;q=0.5' \
-//   -H 'Accept-Encoding: gzip, deflate, br, zstd' \
-//   -H 'Content-Type: application/x-www-form-urlencoded' \
-//   -H 'X-CSRF-Token: 338843a4-a119-488b-bf6a-f14c859f9372' \
-//   -H 'X-Requested-With: XMLHttpRequest' \
-//   -H 'Connection: keep-alive' \
-//   -H 'Referer: https://www.pesuacademy.com/Academy/s/studentProfilePESU' \
-//   -H 'Cookie: JSESSIONID=cg4UsIrybx7nX2AZTk4bkcdG65nU-8_vzw8GICgm.ip-172-21-1-69; _ga_1HJ7TVZ77N=GS2.1.s1754502904$o70$g1$t1754502913$j51$l0$h0; _ga=GA1.1.2008986841.1711732223; AWSALB=jc0HvQT+vGFljbmFIPw7UxYlFsxI4DlYQsglpq/zPv9XNfSTS0ZqBOgVQdOKxnHp7Be013MLCoAwJq0cyoFA/7MNZkcMRFcdBkWLZkgsSj4wORCmR+7y+uJFQDGg; AWSALBCORS=jc0HvQT+vGFljbmFIPw7UxYlFsxI4DlYQsglpq/zPv9XNfSTS0ZqBOgVQdOKxnHp7Be013MLCoAwJq0cyoFA/7MNZkcMRFcdBkWLZkgsSj4wORCmR+7y+uJFQDGg' \
-//   -H 'Sec-Fetch-Dest: empty' \
-//   -H 'Sec-Fetch-Mode: cors' \
-//   -H 'Sec-Fetch-Site: same-origin' \
-//   -H 'TE: trailers'
-
-
-
 export const getAllSemesters = async () => {
   const response = await fetch(
     `${BASE_URL}/a/studentProfilePESU/getStudentSemestersPESU`,
@@ -75,9 +54,7 @@ export const getCourseUnits = async (courseId) => {
       method: "GET",
       credentials: "include",
     });
-    // Response is JSON-encoded HTML string (can be empty string "")
     const data = await response.json();
-    // Return null if empty string
     return data && data.trim() ? data : null;
 };
 
@@ -86,9 +63,7 @@ export const getUnitClasses = async (unitId) => {
       method: "GET",
       credentials: "include",
     });
-    // Response is JSON-encoded HTML string (can be empty string "")
     const data = await response.json();
-    // Return null if empty string
     return data && data.trim() ? data : null;
 };
 
@@ -133,13 +108,11 @@ export const getCourseMaterials = async (courseId, classId) => {
     
     const contentType = response.headers.get('Content-Type') || '';
     
-    // If it's a binary file, return the blob
     if (contentType.includes('application/pdf') || 
         contentType.includes('application/octet-stream') ||
         contentType.includes('application/vnd')) {
       return { type: 'binary', data: await response.blob(), contentType };
     }
     
-    // Otherwise return HTML for parsing download links
     return { type: 'html', data: await response.text() };
 };
