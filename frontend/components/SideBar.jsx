@@ -1,16 +1,19 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Drawer, Box, IconButton, Typography } from '@mui/material';
+import { Drawer, Box, IconButton, Typography, Divider } from '@mui/material';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { closeSidebar } from '../redux/sidebarSlice.js';
 import theme from '../Themes/theme.jsx';
+import Home from '../Pages/Home.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
+
 
 
 const Sidebar = () => {
 
     const dispatch = useDispatch();
     const isOpen = useSelector((state) => state.sidebar.isOpen);
+    const currentPage = useSelector((state) => state.sidebar.currentPage);
     const HandleClose = () => {
         dispatch(closeSidebar());
     }
@@ -52,14 +55,12 @@ const Sidebar = () => {
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
-                        // Stretch header to drawer edges by canceling parent padding
-                        marginLeft: "-20px",
-                        marginRight: "-20px",
-                        paddingLeft: 0,
-                        paddingRight: 0,
+                        marginLeft: "-15px",
+                        marginRight: "-15px",
+                        padding: "8px 12px",
                     }}
                 >
-                    <Box sx={{ display: "flex", alignItems: "center", gap: "4px" , padding: "4px 8px" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <img
                             src={logoUrl}
                             alt="PESU Logo"
@@ -69,8 +70,8 @@ const Sidebar = () => {
                                 borderRadius: "50%",
                                 pointerEvents: "none",
                             }}
-                            />
-                        <Typography sx={{ fontWeight: 'bold', color: '#333', fontSize: '18px' }}>
+                        />
+                        <Typography sx={{ fontWeight: 'bold', color: theme.colors.secondary, fontSize: '18px' }}>
                             PESU-MAX
                         </Typography>
                     </Box>
@@ -78,7 +79,19 @@ const Sidebar = () => {
                         <ExitToAppIcon fontSize="large" />
                     </IconButton>
                 </Box>
+                <Divider 
+                    sx={{ 
+                        marginLeft: "-15px",
+                        marginRight: "-15px",
+                        borderColor: theme.colors.secondary,
+                        borderWidth: "1.5px",
+                    }} 
+                />
                 {/* content */}
+                {currentPage === "home" && <Home />}
+                {/* {currentPage === "attendence" && <Attendence />}
+                {currentPage === "GPA" && <Grades />} */}
+
 
             </Box>
         </Drawer>

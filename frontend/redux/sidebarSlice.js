@@ -3,7 +3,8 @@ import { createSlice } from "@reduxjs/toolkit";
 const sidebarSlice = createSlice({
     name: "sidebar",
     initialState:{
-        isOpen: false
+        isOpen: false,
+        currentPage: "home"
     },
     reducers:{
         toggleSidebar: (state) => {
@@ -11,12 +12,16 @@ const sidebarSlice = createSlice({
         },
         openSidebar: (state)=>{
             state.isOpen = true;
+            state.currentPage = "home";
         },
         closeSidebar: (state)=>{
             state.isOpen = false;
+        },
+        setCurrentPage: (state, action) => {
+            state.currentPage = action.payload;
         }
     }
 })
 
-export const  { toggleSidebar,openSidebar,closeSidebar} = sidebarSlice.actions;
+export const  { toggleSidebar,openSidebar,closeSidebar,setCurrentPage} = sidebarSlice.actions;
 export default sidebarSlice.reducer;
