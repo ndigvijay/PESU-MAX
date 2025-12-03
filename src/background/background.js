@@ -1,5 +1,6 @@
 import { getSubjectsCode, getAllSemesters } from "../helpers/pesuAPI.js";
-import { parseSubjectsCode } from "../helpers/parser.js";
+import { parseSubjectsCode ,parseSemesters } from "../helpers/parser.js";
+import { filterEnggSubjectsCode ,getSubjectDetails } from "../helpers/enggSubjects.js"
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
     { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
@@ -17,16 +18,15 @@ function fetchAndStorePESUSessionId() {
 // test call get subjects code
 
 getSubjectsCode().then(data => {
-  console.log(data);
-  chrome.storage.local.set({ subjectsChunk: data });
-  // parseSubjectsCode(data);
-  console.log("subjects ---------");
-  // console.log(subjects);
+  const subjects = parseSubjectsCode(data);
+  chrome.storage.local.set({ subjects: subjects });
+  const enggSubjects  = filterEnggSubjectsCode(subjects)
+  chrome.storage.local.set({ enggSubjects: enggSubjects });
 });
 
 getAllSemesters().then(data => {
-  console.log(data);
-  chrome.storage.local.set({ semestersChunk: data });
+  const semesterData = parseSemesters(data) 
+  chrome.storage.local.set({ semestersData: semesterData });
 });
 
 
