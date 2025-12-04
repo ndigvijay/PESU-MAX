@@ -1,7 +1,7 @@
 import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile } from "../helpers/pesuAPI.js";
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode } from "../helpers/enggSubjects.js";
-import { save } from "../utils/storage.js";
+import { save, load } from "../utils/storage.js";
 
 // Save user profile data in chrome ext storage
 export async function saveUserProfileData() {
@@ -110,3 +110,92 @@ export async function fetchSemesters() {
   }
 }
 
+// In-memory locks 
+const fetchLocks = {
+  sessionId: false,
+  userProfile: false,
+  semesters: false,
+  pesuData: false
+};
+
+// get auth cookie
+function fetchAndStorePESUSessionId() {
+  chrome.cookies.get(
+    { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
+    (cookie) => {
+      if (cookie) {
+        save("JSESSIONID", cookie.value);
+        console.log("Stored JSESSIONID:", cookie.value);
+      } else {
+        console.log("JSESSIONID cookie not found");
+      }
+      fetchLocks.sessionId = false; // Release lock
+    }
+  );
+}
+
+// Check and fetch missing data 
+async function syncMissingData() {
+  let [sessionId, userProfile, semesters, pesuData] = await Promise.all([
+    load("JSESSIONID"),
+    load("userProfile"),
+    load("semestersData"),
+    load("pesuData")
+  ]);
+
+  // Always fetch session ID if missing
+  if (!sessionId && !fetchLocks.sessionId) {
+    fetchLocks.sessionId = true;
+    fetchAndStorePESUSessionId();
+  }
+
+  // Fetch user profile if missing 
+  if (!userProfile && !fetchLocks.userProfile) {
+    fetchLocks.userProfile = true;
+    await saveUserProfileData();
+    fetchLocks.userProfile = false;
+    // Reload profile to check if it was saved
+    userProfile = await load("userProfile");
+  }
+
+  // Only fetch semesters and pesuData AFTER profile exists
+  if (userProfile) {
+    if (!semesters && !fetchLocks.semesters) {
+      fetchLocks.semesters = true;
+      fetchSemesters().finally(() => { fetchLocks.semesters = false; });
+    }
+
+    if (!pesuData && !fetchLocks.pesuData) {
+      fetchLocks.pesuData = true;
+      // Save fetch status to storage so frontend can show indicator
+      chrome.storage.local.set({ fetchStatus: { pesuData: true } });
+      
+      fetchAllPESUData().finally(() => {
+        fetchLocks.pesuData = false;
+        chrome.storage.local.set({ fetchStatus: { pesuData: false } });
+      });
+    }
+  }
+}
+
+// Initialize alarm  sync
+export function initializeDataSync() {
+  chrome.runtime.onInstalled.addListener(() => {
+    chrome.alarms.create("syncData", { periodInMinutes: 1 });
+  });
+
+  chrome.runtime.onStartup.addListener(() => {
+    chrome.alarms.create("syncData", { periodInMinutes: 1 });
+  });
+
+  // Handle alarm - runs every 1 minute
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === "syncData") {
+      console.log("Syncing data");
+      syncMissingData();
+    }
+  });
+
+  // Run immediately on load
+  syncMissingData();
+}

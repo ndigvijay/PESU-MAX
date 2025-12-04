@@ -1,24 +1,7 @@
-import { save, load } from "../utils/storage.js";
+import { load } from "../utils/storage.js";
 import { getPESUDataPagination } from "../helpers/getStorageData.js";
 import { handleBulkDownload } from "../helpers/downloadController.js";
-import { saveUserProfileData, fetchAllPESUData, fetchSemesters } from "../initalizers/initialDataSave.js";
-
-// get auth cookie
-function fetchAndStorePESUSessionId() {
-  chrome.cookies.get(
-    { url: "https://www.pesuacademy.com/Academy/", name: "JSESSIONID" },
-    (cookie) => {
-      if (cookie) {
-        save("JSESSIONID", cookie.value);
-        console.log("Stored JSESSIONID:", cookie.value);
-      } else {
-        console.log("JSESSIONID cookie not found");
-      }
-    }
-  );
-}
-
-
+import { initializeDataSync } from "../initalizers/initialDataSave.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -53,12 +36,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Run fetches
-// fetchAndStorePESUSessionId();
-// saveUserProfileData();
-// fetchSemesters();
-// fetchAllPESUData();
-
-
-
-
+// Initialize data sync with alarms
+initializeDataSync();

@@ -72,6 +72,9 @@ const CourseMaterial = () => {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadResult, setDownloadResult] = useState(null);
 
+  // Background fetch status
+  const [isFetchingInBackground, setIsFetchingInBackground] = useState(false);
+
   // Fetch data
   const fetchData = () => {
     setLoading(true);
@@ -100,6 +103,26 @@ const CourseMaterial = () => {
   useEffect(() => {
     fetchData();
   }, [page, rowsPerPage, search, semester]);
+
+  // Listen for background fetch status
+  useEffect(() => {
+    chrome.storage.local.get("fetchStatus", (result) => {
+      setIsFetchingInBackground(result.fetchStatus?.pesuData === true);
+    });
+    
+    // Listen for storage changes
+    const listener = (changes) => {
+      if (changes.fetchStatus) {
+        setIsFetchingInBackground(changes.fetchStatus.newValue?.pesuData === true);
+      }
+      // Refetch data when pesuData is updated
+      if (changes.pesuData) {
+        fetchData();
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
 
   const HandleBack = () => {
     dispatch(setCurrentPage("home"));
@@ -331,35 +354,11 @@ const CourseMaterial = () => {
       }
 
       if (response && response.success) {
-        // Convert base64 back to blob and download
-        try {
-          const binaryString = atob(response.data);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          const blob = new Blob([bytes], { type: 'application/zip' });
-          
-          // Trigger download
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `PESU_Materials_${new Date().toISOString().split('T')[0]}.zip`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          setDownloadResult({
-            success: true,
-            stats: response.stats
-          });
-        } catch (err) {
-          setDownloadResult({
-            success: false,
-            error: 'Failed to process download: ' + err.message
-          });
-        }
+        // Download is triggered directly by background script via chrome.downloads API
+        setDownloadResult({
+          success: true,
+          stats: response.stats
+        });
       } else if (response && response.error) {
         setDownloadResult({
           success: false,
@@ -689,7 +688,12 @@ const CourseMaterial = () => {
               {(!pesuData?.items || pesuData.items.length === 0) && (
                 <TableRow>
                   <TableCell colSpan={4} sx={{ textAlign: 'center', padding: '24px', color: '#666' }}>
-                    {search ? 'No results found' : 'No course materials available'}
+                    {isFetchingInBackground ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                        <CircularProgress size={16} sx={{ color: theme.colors.primary }} />
+                        <span>Fetching course data...</span>
+                      </Box>
+                    ) : search ? 'No results found' : 'No course materials available'}
                   </TableCell>
                 </TableRow>
               )}
