@@ -270,3 +270,28 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
   return result;
 }
 
+// Get all PESU data in nested format 
+export async function getAllPESUDataNested() {
+  const data = await load("pesuData");
+
+  if (!data) {
+    return null;
+  }
+
+  return Object.values(data.subjects || {}).map(subject => ({
+    id: subject.id,
+    subjectCode: subject.subjectCode,
+    subjectName: subject.subjectName,
+    semester: getSemester(subject.subjectCode),
+    units: Object.values(subject.units || {}).map(unit => ({
+      id: unit.id,
+      name: unit.name,
+      classes: (unit.classes || []).map(cls => ({
+        id: cls.id,
+        className: cls.className,
+        classType: cls.classType
+      }))
+    }))
+  }));
+}
+

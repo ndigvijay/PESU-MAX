@@ -287,12 +287,12 @@ const CourseMaterial = () => {
   }, [selectedClasses]);
 
   // Collect selected items with full context for download
-  const getSelectedItemsForDownload = () => {
+  const getSelectedItemsForDownload = (allData) => {
     const selectedItems = [];
-    
-    if (!pesuData?.items) return selectedItems;
-    
-    for (const subject of pesuData.items) {
+
+    if (!allData || !Array.isArray(allData)) return selectedItems;
+
+    for (const subject of allData) {
       (subject.units || []).forEach((unit, unitIndex) => {
         for (const cls of (unit.classes || [])) {
           if (selectedClasses[cls.id]) {
@@ -310,61 +310,78 @@ const CourseMaterial = () => {
         }
       });
     }
-    
+
     return selectedItems;
   };
 
   // Handle bulk download
   const HandleBulkDownload = async () => {
-    const selectedItems = getSelectedItemsForDownload();
-    
-    if (selectedItems.length === 0) {
+    if (getSelectedCount === 0) {
       return;
     }
 
-    setDownloading(true);
-    setDownloadDialogOpen(true);
-    setDownloadProgress({ current: 0, total: selectedItems.length, currentItem: 'Starting...', status: 'downloading' });
-    setDownloadResult(null);
-
-    // Set up progress listener
-    chrome.runtime.onConnect.addListener(function progressListener(port) {
-      if (port.name === "downloadProgress") {
-        port.onMessage.addListener((progress) => {
-          setDownloadProgress(progress);
-        });
-        port.onDisconnect.addListener(() => {
-          chrome.runtime.onConnect.removeListener(progressListener);
-        });
-      }
-    });
-
-    chrome.runtime.sendMessage({
-      action: "downloadSelectedMaterials",
-      selectedItems
-    }, (response) => {
-      setDownloading(false);
-      
+    // fetch all the  data from chrome extension 
+    chrome.runtime.sendMessage({ action: "getAllPESUData" }, (allDataResponse) => {
       if (chrome.runtime.lastError) {
-        setDownloadResult({ 
-          success: false, 
-          error: chrome.runtime.lastError.message 
-        });
+        console.error("Error fetching all data:", chrome.runtime.lastError.message);
         return;
       }
 
-      if (response && response.success) {
-        // Download is triggered directly by background script via chrome.downloads API
-        setDownloadResult({
-          success: true,
-          stats: response.stats
-        });
-      } else if (response && response.error) {
-        setDownloadResult({
-          success: false,
-          error: response.error
-        });
+      if (!allDataResponse || !allDataResponse.data) {
+        console.error("No data received from getAllPESUData");
+        return;
       }
+
+      const selectedItems = getSelectedItemsForDownload(allDataResponse.data);
+
+      if (selectedItems.length === 0) {
+        return;
+      }
+
+      setDownloading(true);
+      setDownloadDialogOpen(true);
+      setDownloadProgress({ current: 0, total: selectedItems.length, currentItem: 'Starting...', status: 'downloading' });
+      setDownloadResult(null);
+
+      // Set up progress listener
+      chrome.runtime.onConnect.addListener(function progressListener(port) {
+        if (port.name === "downloadProgress") {
+          port.onMessage.addListener((progress) => {
+            setDownloadProgress(progress);
+          });
+          port.onDisconnect.addListener(() => {
+            chrome.runtime.onConnect.removeListener(progressListener);
+          });
+        }
+      });
+
+      chrome.runtime.sendMessage({
+        action: "downloadSelectedMaterials",
+        selectedItems
+      }, (response) => {
+        setDownloading(false);
+
+        if (chrome.runtime.lastError) {
+          setDownloadResult({
+            success: false,
+            error: chrome.runtime.lastError.message
+          });
+          return;
+        }
+
+        if (response && response.success) {
+          // Download 
+          setDownloadResult({
+            success: true,
+            stats: response.stats
+          });
+        } else if (response && response.error) {
+          setDownloadResult({
+            success: false,
+            error: response.error
+          });
+        }
+      });
     });
   };
 

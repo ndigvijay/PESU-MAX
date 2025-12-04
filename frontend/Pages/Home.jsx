@@ -60,7 +60,7 @@ const Home = () => {
               dispatch(setCurrentPage("courseMaterial"));
             }}
           >
-            Download All Course Materials
+            Download All PESU Slides
           </Button>)}
           {isLoggedIn && (<Button 
             variant="contained" 

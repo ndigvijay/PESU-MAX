@@ -1,5 +1,5 @@
 import { load } from "../utils/storage.js";
-import { getPESUDataPagination } from "../helpers/getStorageData.js";
+import { getPESUDataPagination, getAllPESUDataNested } from "../helpers/getStorageData.js";
 import { handleBulkDownload } from "../helpers/downloadController.js";
 import { initializeDataSync } from "../initalizers/initialDataSave.js";
 
@@ -26,7 +26,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => {
         sendResponse({ error: error.message });
       });
-    
+
+    return true;
+  }
+
+  if (request.action === "getAllPESUData") {
+    getAllPESUDataNested()
+      .then((result) => {
+        sendResponse({ data: result });
+      })
+      .catch((error) => {
+        sendResponse({ error: error.message });
+      });
+
     return true;
   }
 
