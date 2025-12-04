@@ -4,6 +4,11 @@ Made to Overclock PESU-Academy
 
 <img width="410" height="801" alt="image" src="https://github.com/user-attachments/assets/fdee12c7-84f6-47b0-9c60-33cadb1f4768" />
 
+
+
+https://github.com/user-attachments/assets/f326dab6-3d37-4be4-a399-8b66b4d2739f
+
+
 ## NOTE
 
 Login and load the package for faster auth.
