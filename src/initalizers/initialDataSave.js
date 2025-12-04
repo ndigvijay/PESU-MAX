@@ -196,6 +196,16 @@ export function initializeDataSync() {
     }
   });
 
+  // Trigger sync when user logs in
+  chrome.cookies.onChanged.addListener((changeInfo) => {
+    if (changeInfo.cookie.name === "JSESSIONID" && 
+        changeInfo.cookie.domain.includes("pesuacademy.com") &&
+        !changeInfo.removed) {
+      console.log("Login detected, syncing data...");
+      syncMissingData();
+    }
+  });
+
   // Run immediately on load
   syncMissingData();
 }

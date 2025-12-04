@@ -691,7 +691,7 @@ const CourseMaterial = () => {
                     {isFetchingInBackground ? (
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
                         <CircularProgress size={16} sx={{ color: theme.colors.primary }} />
-                        <span>Fetching course data...</span>
+                        <span>Fetching course data... Please wait a minute...</span>
                       </Box>
                     ) : search ? 'No results found' : 'No course materials available'}
                   </TableCell>
