@@ -1,0 +1,217 @@
+{
+  "firstYearEngineeringSubjects": [
+    {
+      "reference": "maths",
+      "dbName": "Engineering Mathematics",
+      "courseCodeId": "MA",
+      "subjects": [
+        "Engineering Mathematics - I",
+        "Engineering Mathematics - II"
+      ]
+    },
+    {
+      "reference": "epd",
+      "dbName": "Electronic Principles and Devices",
+      "courseCodeId": "EC",
+      "subjects": [
+        "Electronic Principles and Devices"
+      ]
+    },
+    {
+      "reference": "eee",
+      "dbName": "Elements of Electrical Engineering",
+      "courseCodeId": "EE",
+      "subjects": [
+        "Elements of Electrical Engineering"
+      ]
+    },
+    {
+      "reference": "constitution",
+      "dbName": "Constitution Of India, Cyber Law and Professional Ethics",
+      "courseCodeId": "CE",
+      "subjects": [
+        "Constitution Of India, Cyber Law and Professional Ethics"
+      ]
+    },
+    {
+      "reference": "mechanics",
+      "dbName": "Engineering Mechanics",
+      "courseCodeId": "CV",
+      "subjects": [
+        "Engineering Mechanics - Statics"
+      ]
+    },
+    {
+      "reference": "chemistry",
+      "dbName": "Engineering Chemistry",
+      "courseCodeId": "CY",
+      "subjects": [
+        "Engineering Chemistry",
+        "Chemistry Laboratory"
+      ]
+    },
+    {
+      "reference": "physics",
+      "dbName": "Engineering Physics",
+      "courseCodeId": "PH",
+      "subjects": [
+        "Engineering Physics",
+        "Physics Laboratory"
+      ]
+    },
+    {
+      "reference": "mechanical",
+      "dbName": "Mechanical Engineering Sciences",
+      "courseCodeId": "ME",
+      "subjects": [
+        "Mechanical Engineering Sciences"
+      ]
+    },
+    {
+      "reference": "evs",
+      "dbName": "Environmental Studies and Life Sciences",
+      "courseCodeId": "EV",
+      "subjects": [
+        "Environmental Studies and Life Sciences"
+      ]
+    }
+  ],
+  "BranchMappings": [
+    {
+      "reference": "CSE",
+      "dbName": "Computer Science and Engineering",
+      "courseCodeId": "CS"
+    },
+    {
+      "reference": "CSE (AI&ML)",
+      "dbName": "Computer Science and Engineering (AI&ML)",
+      "courseCodeId": "CS",
+      "courseCodeId2":"AM"
+    },
+    {
+      "reference": "ECE",
+      "dbName": "Electronics and Communication Engineering",
+      "courseCodeId": "EC"
+    },
+    {
+      "reference": "EEE",
+      "dbName": "Electrical and Electronics Engineering",
+      "courseCodeId": "EE"
+    },
+    {
+      "reference": "ME",
+      "dbName": "Mechanical Engineering",
+      "courseCodeId": "ME"
+    },
+    {
+      "reference": "BT",
+      "dbName": "Biotechnology",
+      "courseCodeId": "BT"
+    },
+    {
+      "reference": "CV",
+      "dbName": "Civil Engineering",
+      "courseCodeId": "CV"
+    },
+    {
+      "reference": "B ARCH",
+      "dbName": "Bachelor of Architecture",
+      "courseCodeId": "AR"
+    },
+    {
+      "reference": "BBA",
+      "dbName": "Bachelor of Business Administration",
+      "courseCodeId": "BB"
+    },
+    {
+      "reference": "B.DES",
+      "dbName": "Bachelor of Design",
+      "courseCodeId": "BD"
+    },
+    {
+      "reference": "BBA LLB",
+      "dbName": "Bachelor of Business Administration and Bachelor of Laws",
+      "courseCodeId": "BL"
+    },
+    {
+      "reference": "BBA-HEM",
+      "dbName": "Bachelor of Business Administration - Hotel and Event Management",
+      "courseCodeId": "BH"
+    },
+    {
+      "reference": "BA LLB",
+      "dbName": "Bachelor of Arts and Bachelor of Laws",
+      "courseCodeId": "AL"
+    },
+    {
+      "reference": "BBA - Sports Management",
+      "dbName": "Bachelor of Business Administration - Sports Management",
+      "courseCodeId": "BS"
+    },
+    {
+      "reference": "BCA",
+      "dbName": "Bachelor of Computer Applications",
+      "courseCodeId": "CA"
+    },
+    {
+      "reference": "B.Com",
+      "dbName": "Bachelor of Commerce",
+      "courseCodeId": "BC"
+    },
+    {
+      "reference": "BBA (Hons) in Business Analytics",
+      "dbName": "Bachelor of Business Administration (Honours) in Business Analytics",
+      "courseCodeId": "BA"
+    },
+    {
+      "reference": "B.Com (Hons) with ACCA",
+      "dbName": "Bachelor of Commerce (Honours) with ACCA",
+      "courseCodeId": "AC"
+    },
+    {
+      "reference": "Psychology",
+      "dbName": "Bachelor of Science in Psychology",
+      "courseCodeId": "PS"
+    },
+    {
+      "reference": "Sports Management",
+      "dbName": "Bachelor of Sports Management",
+      "courseCodeId": "SM"
+    },
+    {
+      "reference": "Bachelor of Pharmacy",
+      "dbName": "Bachelor of Pharmacy",
+      "courseCodeId": "PH"
+    },
+    {
+      "reference": "Nursing",
+      "dbName": "Bachelor of Science in Nursing",
+      "courseCodeId": "NU"
+    },
+    {
+      "reference": "CA",
+      "dbName": "Chartered Accountancy",
+      "courseCodeId": "CN"
+    },
+    {
+      "reference": "International Accounting and Finance",
+      "dbName": "Bachelor of International Accounting and Finance",
+      "courseCodeId": "IA"
+    },
+    {
+      "reference": "Business Analytics",
+      "dbName": "Master of Business Analytics",
+      "courseCodeId": "AN"
+    },
+    {
+      "reference": "MBA",
+      "dbName": "Master of Business Administration",
+      "courseCodeId": "MB"
+    },
+    {
+      "reference": "MBBS",
+      "dbName": "Bachelor of Medicine and Bachelor of Surgery",
+      "courseCodeId": "MD"
+    }
+  ]
+}

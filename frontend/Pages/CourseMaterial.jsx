@@ -35,18 +35,6 @@ import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import theme from "../Themes/theme.jsx";
 
-const SEMESTERS = [
-  { value: "all", label: "All Semesters" },
-  { value: "1", label: "Semester 1" },
-  { value: "2", label: "Semester 2" },
-  { value: "3", label: "Semester 3" },
-  { value: "4", label: "Semester 4" },
-  { value: "5", label: "Semester 5" },
-  { value: "6", label: "Semester 6" },
-  { value: "7", label: "Semester 7" },
-  { value: "8", label: "Semester 8" }
-];
-
 const CourseMaterial = () => {
   const dispatch = useDispatch();
   const [pesuData, setPesuData] = useState(null);
@@ -54,6 +42,7 @@ const CourseMaterial = () => {
   const [searchInput, setSearchInput] = useState(""); // Input field value
   const [search, setSearch] = useState(""); // Actual search query sent to API
   const [semester, setSemester] = useState("all");
+  const [semesters, setSemesters] = useState([{ value: "all", label: "All Semesters" }]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   
@@ -103,6 +92,15 @@ const CourseMaterial = () => {
   useEffect(() => {
     fetchData();
   }, [page, rowsPerPage, search, semester]);
+
+  // Fetch dynamic semesters data 
+  useEffect(() => {
+    chrome.runtime.sendMessage({ action: "getSemestersData" }, (response) => {
+      if (response && response.data) {
+        setSemesters(response.data);
+      }
+    });
+  }, []);
 
   // Listen for background fetch status
   useEffect(() => {
@@ -513,7 +511,7 @@ const CourseMaterial = () => {
               }
             }}
           >
-            {SEMESTERS.map((sem) => (
+            {semesters.map((sem) => (
               <MenuItem key={sem.value} value={sem.value} sx={{ fontSize: '13px' }}>
                 {sem.label}
               </MenuItem>

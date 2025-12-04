@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import { getCourseMaterials } from './pesuAPI.js';
 import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
+import { parallelBatch } from './MiscControllers.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -141,61 +142,60 @@ async function getClassMaterialFile(subjectId, classId) {
   }
 }
 
-// Create zip file from selected classes
 export async function createBulkDownloadZip(selectedItems, progressCallback) {
   const zip = new JSZip();
   const totalItems = selectedItems.length;
   let completed = 0;
-  let failed = 0;
-  const failedItems = [];
-  
-  for (const item of selectedItems) {
-    const { subjectId, subjectCode, subjectName, unitNumber, classId, className } = item;
-    
-    // Update progress
-    if (progressCallback) {
-      progressCallback({
-        current: completed + 1,
-        total: totalItems,
-        currentItem: className,
-        status: 'downloading'
-      });
-    }
+
+  const results = await parallelBatch(selectedItems, async (item) => {
+    const { subjectId, classId, className } = item;
     
     try {
       const result = await getClassMaterialFile(subjectId, classId);
-      
-      if (result.success && result.blob) {
-        // Create folder structure: SubjectCode/UnitNumber/ClassName.ext
-        // e.g., CS342/1/Lecture_1.pdf, CS342/2/Lecture_5.pdf
-        const safeFolderName_ = sanitizeFilename(subjectName);
-        const safeFolderName = safeFolderName_;
-        const unitFolder = String(unitNumber || 1); 
-        const safeFileName = sanitizeFilename(className) + result.extension;
-        
-        const filePath = `${safeFolderName}/${unitFolder}/${safeFileName}`;
-        
-        // Add to zip
-        const arrayBuffer = await result.blob.arrayBuffer();
-        const useStore = isAlreadyCompressedExt(result.extension);
-        const fileOptions = useStore
-          ? { binary: true, compression: 'STORE' }
-          : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
-
-        zip.file(filePath, arrayBuffer, fileOptions);
-      } else {
-        failed++;
-        failedItems.push({
-          subjectName,
-          subjectCode,
-          subjectId,
-          unitNumber,
-          className,
-          classId,
-          error: result.error || 'Unknown error'
+      completed++;
+      if (progressCallback) {
+        progressCallback({
+          current: completed,
+          total: totalItems,
+          currentItem: className,
+          status: 'downloading'
         });
       }
+      return { item, result };
     } catch (error) {
+      completed++;
+      if (progressCallback) {
+        progressCallback({
+          current: completed,
+          total: totalItems,
+          currentItem: className,
+          status: 'downloading'
+        });
+      }
+      return { item, result: { success: false, error: error.message } };
+    }
+  }, 5);
+
+  const failedItems = [];
+  let failed = 0;
+
+  for (const { item, result } of results) {
+    const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
+    
+    if (result.success && result.blob) {
+      const safeFolderName = sanitizeFilename(subjectName);
+      const unitFolder = String(unitNumber || 1);
+      const safeFileName = sanitizeFilename(className) + result.extension;
+      const filePath = `${safeFolderName}/${unitFolder}/${safeFileName}`;
+      
+      const arrayBuffer = await result.blob.arrayBuffer();
+      const useStore = isAlreadyCompressedExt(result.extension);
+      const fileOptions = useStore
+        ? { binary: true, compression: 'STORE' }
+        : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
+
+      zip.file(filePath, arrayBuffer, fileOptions);
+    } else {
       failed++;
       failedItems.push({
         subjectName,
@@ -204,14 +204,11 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
         unitNumber,
         className,
         classId,
-        error: error.message || 'Unexpected error'
+        error: result.error || 'Unknown error'
       });
     }
-    
-    completed++;
   }
   
-  // Update progress - generating zip
   if (progressCallback) {
     progressCallback({
       current: totalItems,
@@ -221,7 +218,6 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
     });
   }
   
-  // Generate the zip blob
   const zipBlob = await zip.generateAsync({ 
     type: 'blob',
     compression: 'DEFLATE',
