@@ -2,6 +2,7 @@ import { load } from "../utils/storage.js";
 import { getPESUDataPagination, getAllPESUDataNested } from "../helpers/getStorageData.js";
 import { handleBulkDownload } from "../helpers/downloadController.js";
 import { initializeDataSync } from "../initalizers/initialDataSave.js";
+import { getSemestersData } from "../helpers/MiscControllers.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -44,6 +45,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "downloadSelectedMaterials") {
     handleBulkDownload(request.selectedItems, sender, sendResponse);
+    return true;
+  }
+
+  if (request.action === "getSemestersData") {
+    getSemestersData()
+      .then((data) => {
+        sendResponse({ data: data });
+      })
+      .catch((error) => {
+        sendResponse({ error: error.message });
+      });
     return true;
   }
 });
