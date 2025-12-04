@@ -156,7 +156,10 @@
     {
       "reference": "B.Com",
       "dbName": "Bachelor of Commerce",
-      "courseCodeId": "BC"
+      "courseCodeId": "BC",
+      "subjects": [
+        "Accounting for Business"
+      ]
     },
     {
       "reference": "BBA (Hons) in Business Analytics",
