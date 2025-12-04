@@ -2,6 +2,7 @@ import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUs
 import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
 import { filterEnggSubjectsCode } from "../helpers/enggSubjects.js";
 import { save, load } from "../utils/storage.js";
+import { parallelBatch } from "../helpers/MiscControllers.js";
 
 // Save user profile data in chrome ext storage
 export async function saveUserProfileData() {
@@ -25,7 +26,6 @@ export async function saveUserProfileData() {
   }
 }
 
-// Fetch and store all PESU data
 export async function fetchAllPESUData() {
   try {
     const subjectsData = await getSubjectsCode();
@@ -38,50 +38,52 @@ export async function fetchAllPESUData() {
     const enggSubjects = await filterEnggSubjectsCode(subjects);
     console.log(`Found ${enggSubjects.length} engineering subjects`);
 
+    const subjectsWithUnits = await parallelBatch(enggSubjects, async (subject) => {
+      if (!subject.id) return null;
+      try {
+        const unitsData = await getCourseUnits(subject.id);
+        const units = unitsData ? parseCourseUnits(unitsData) : [];
+        return { ...subject, units };
+      } catch (err) {
+        console.error(`Error fetching units for subject ${subject.id}:`, err);
+        return { ...subject, units: [] };
+      }
+    }, 5);
+
+    const validSubjects = subjectsWithUnits.filter(s => s !== null);
+
+    const allUnits = validSubjects.flatMap(s => 
+      s.units.filter(u => u.id).map(u => ({ subjectId: s.id, unit: u }))
+    );
+
+    const unitsWithClasses = await parallelBatch(allUnits, async ({ subjectId, unit }) => {
+      try {
+        const classesData = await getUnitClasses(unit.id);
+        const classes = classesData ? parseUnitClasses(classesData) : [];
+        return { subjectId, unit: { ...unit, classes } };
+      } catch (err) {
+        console.error(`Error fetching classes for unit ${unit.id}:`, err);
+        return { subjectId, unit: { ...unit, classes: [] } };
+      }
+    }, 5);
+
     const subjectsMap = {};
-    
-    for (const subject of enggSubjects) {
-      if (!subject.id) continue;
-      
+    for (const subject of validSubjects) {
       subjectsMap[subject.id] = {
         id: subject.id,
         subjectCode: subject.subjectCode,
         subjectName: subject.subjectName,
         units: {}
       };
+    }
 
-      try {
-        const unitsData = await getCourseUnits(subject.id);
-        if (!unitsData) continue;
-        
-        const units = parseCourseUnits(unitsData);
-        if (units.length === 0) continue;
-        
-        console.log(`Subject ${subject.subjectCode}: ${units.length} units`);
-
-        for (const unit of units) {
-          if (!unit.id) continue;
-          
-          subjectsMap[subject.id].units[unit.id] = {
-            id: unit.id,
-            name: unit.name,
-            classes: []
-          };
-
-          try {
-            const classesData = await getUnitClasses(unit.id);
-            if (!classesData) continue;
-            
-            const classes = parseUnitClasses(classesData);
-            if (classes.length > 0) {
-              subjectsMap[subject.id].units[unit.id].classes = classes;
-            }
-          } catch (err) {
-            console.error(`Error fetching classes for unit ${unit.id}:`, err);
-          }
-        }
-      } catch (err) {
-        console.error(`Error fetching units for subject ${subject.id}:`, err);
+    for (const { subjectId, unit } of unitsWithClasses) {
+      if (subjectsMap[subjectId]) {
+        subjectsMap[subjectId].units[unit.id] = {
+          id: unit.id,
+          name: unit.name,
+          classes: unit.classes
+        };
       }
     }
 

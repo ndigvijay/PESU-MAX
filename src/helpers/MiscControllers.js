@@ -1,5 +1,14 @@
 import { load } from "../utils/storage.js";
 
+export const parallelBatch = async (items, asyncFn, concurrency = 5) => {
+  const results = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map(asyncFn));
+    results.push(...batchResults);
+  }
+  return results;
+};
 
 export const getSemestersData = async () => {
   const semestersData = await load("semestersData");
