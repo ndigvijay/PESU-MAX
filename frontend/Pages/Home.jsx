@@ -37,7 +37,7 @@ const Home = () => {
               padding: '12px'
             }}
           >
-            Bunk-o-Meter
+            Attendence Calculator
           </Button>
           <Button 
             variant="contained" 

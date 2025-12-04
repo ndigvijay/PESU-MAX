@@ -17,7 +17,14 @@ import {
   CircularProgress,
   FormControl,
   Select,
-  MenuItem
+  MenuItem,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  LinearProgress,
+  Alert
 } from "@mui/material";
 import { useDispatch } from "react-redux";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
@@ -25,6 +32,7 @@ import KeyboardBackspaceIcon from '@mui/icons-material/KeyboardBackspace';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import SearchIcon from '@mui/icons-material/Search';
+import DownloadIcon from '@mui/icons-material/Download';
 import theme from "../Themes/theme.jsx";
 
 const SEMESTERS = [
@@ -57,6 +65,12 @@ const CourseMaterial = () => {
   // Expanded state
   const [expandedSubjects, setExpandedSubjects] = useState({});
   const [expandedUnits, setExpandedUnits] = useState({});
+
+  // Download state
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, currentItem: '', status: '' });
+  const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [downloadResult, setDownloadResult] = useState(null);
 
   // Fetch data
   const fetchData = () => {
@@ -244,6 +258,124 @@ const CourseMaterial = () => {
     return hasSelected && hasUnselected;
   };
 
+  // Get count of selected classes
+  const getSelectedCount = useMemo(() => {
+    return Object.values(selectedClasses).filter(Boolean).length;
+  }, [selectedClasses]);
+
+  // Collect selected items with full context for download
+  const getSelectedItemsForDownload = () => {
+    const selectedItems = [];
+    
+    if (!pesuData?.items) return selectedItems;
+    
+    for (const subject of pesuData.items) {
+      (subject.units || []).forEach((unit, unitIndex) => {
+        for (const cls of (unit.classes || [])) {
+          if (selectedClasses[cls.id]) {
+            selectedItems.push({
+              subjectId: subject.id,
+              subjectCode: subject.subjectCode,
+              subjectName: subject.subjectName,
+              unitId: unit.id,
+              unitName: unit.name,
+              unitNumber: unitIndex + 1, // 1-based unit number for folder structure
+              classId: cls.id,
+              className: cls.className
+            });
+          }
+        }
+      });
+    }
+    
+    return selectedItems;
+  };
+
+  // Handle bulk download
+  const HandleBulkDownload = async () => {
+    const selectedItems = getSelectedItemsForDownload();
+    
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    setDownloading(true);
+    setDownloadDialogOpen(true);
+    setDownloadProgress({ current: 0, total: selectedItems.length, currentItem: 'Starting...', status: 'downloading' });
+    setDownloadResult(null);
+
+    // Set up progress listener
+    chrome.runtime.onConnect.addListener(function progressListener(port) {
+      if (port.name === "downloadProgress") {
+        port.onMessage.addListener((progress) => {
+          setDownloadProgress(progress);
+        });
+        port.onDisconnect.addListener(() => {
+          chrome.runtime.onConnect.removeListener(progressListener);
+        });
+      }
+    });
+
+    chrome.runtime.sendMessage({
+      action: "downloadSelectedMaterials",
+      selectedItems
+    }, (response) => {
+      setDownloading(false);
+      
+      if (chrome.runtime.lastError) {
+        setDownloadResult({ 
+          success: false, 
+          error: chrome.runtime.lastError.message 
+        });
+        return;
+      }
+
+      if (response && response.success) {
+        // Convert base64 back to blob and download
+        try {
+          const binaryString = atob(response.data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: 'application/zip' });
+          
+          // Trigger download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `PESU_Materials_${new Date().toISOString().split('T')[0]}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          setDownloadResult({
+            success: true,
+            stats: response.stats
+          });
+        } catch (err) {
+          setDownloadResult({
+            success: false,
+            error: 'Failed to process download: ' + err.message
+          });
+        }
+      } else if (response && response.error) {
+        setDownloadResult({
+          success: false,
+          error: response.error
+        });
+      }
+    });
+  };
+
+  const HandleCloseDownloadDialog = () => {
+    if (!downloading) {
+      setDownloadDialogOpen(false);
+      setDownloadResult(null);
+    }
+  };
+
   // Table cell styles
   const headerCellSx = {
     backgroundColor: theme.table.headerBg,
@@ -310,7 +442,6 @@ const CourseMaterial = () => {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchIcon sx={{ color: theme.colors.secondary, fontSize: '20px' }} />
               </InputAdornment>
             ),
             endAdornment: (
@@ -373,6 +504,30 @@ const CourseMaterial = () => {
             ))}
           </Select>
         </FormControl>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<DownloadIcon />}
+          onClick={HandleBulkDownload}
+          disabled={getSelectedCount === 0 || downloading}
+          sx={{
+            backgroundColor: theme.colors.primary,
+            borderRadius: '8px',
+            fontSize: '12px',
+            textTransform: 'none',
+            padding: '6px 12px',
+            minWidth: 'auto',
+            '&:hover': {
+              backgroundColor: theme.colors.primaryHover
+            },
+            '&.Mui-disabled': {
+              backgroundColor: theme.colors.secondaryLight,
+              color: '#999'
+            }
+          }}
+        >
+        {getSelectedCount}
+        </Button>
       </Box>
 
       {/* Table */}
@@ -565,6 +720,164 @@ const CourseMaterial = () => {
           }}
         />
       )}
+
+      {/* Download Progress Dialog */}
+      <Dialog 
+        open={downloadDialogOpen} 
+        onClose={HandleCloseDownloadDialog}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            padding: '8px'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          color: theme.colors.secondary, 
+          fontWeight: 'bold',
+          fontSize: '16px',
+          paddingBottom: '8px'
+        }}>
+          {downloading ? 'Downloading Materials...' : 'Download Complete'}
+        </DialogTitle>
+        <DialogContent>
+          {downloading && (
+            <Box sx={{ width: '100%' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
+                  {downloadProgress.status === 'zipping' 
+                    ? 'Creating ZIP file...' 
+                    : `Downloading ${downloadProgress.current} of ${downloadProgress.total}`}
+                </Typography>
+                <Typography variant="body2" sx={{ color: theme.colors.primary, fontSize: '12px', fontWeight: '500' }}>
+                  {downloadProgress.total > 0 
+                    ? `${Math.round((downloadProgress.current / downloadProgress.total) * 100)}%` 
+                    : '0%'}
+                </Typography>
+              </Box>
+              <LinearProgress 
+                variant="determinate" 
+                value={downloadProgress.total > 0 
+                  ? (downloadProgress.current / downloadProgress.total) * 100 
+                  : 0}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.colors.secondaryLight,
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: 4
+                  }
+                }}
+              />
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  mt: 1, 
+                  color: '#888', 
+                  fontSize: '11px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {downloadProgress.currentItem}
+              </Typography>
+            </Box>
+          )}
+
+          {!downloading && downloadResult && (
+            <Box>
+              {downloadResult.success ? (
+                <Alert severity="success" sx={{ 
+                  fontSize: '13px',
+                  backgroundColor: theme.colors.secondary,
+                  color: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  '& .MuiAlert-icon': {
+                    color: '#ffffff'
+                  }
+                }}>
+                  Successfully downloaded {downloadResult.stats?.successful || 0} files!
+                  {downloadResult.stats?.failed > 0 && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>
+                        {downloadResult.stats.failed} files could not be downloaded:
+                      </Typography>
+                      {downloadResult.stats.failedItems?.length > 0 && (
+                        <Box 
+                          component="ul" 
+                          sx={{ 
+                            mt: 0.5, 
+                            pl: 2, 
+                            mb: 0, 
+                            color: '#ffffff',
+                            fontSize: '11px'
+                          }}
+                        >
+                          {downloadResult.stats.failedItems.map((item, index) => (
+                            <Box 
+                              component="li" 
+                              key={item.classId || `${item.subjectId || 'failed'}-${index}`}
+                              sx={{ mb: 0.5 }}
+                            >
+                              <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>
+                                {(item.subjectName && item.subjectName !== item.className) 
+                                  ? `${item.subjectName} – ${item.className}` 
+                                  : (item.className || 'Unknown class')}
+                              </Typography>
+                              {item.error && (
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.8)' }}
+                                >
+                                  Reason: {item.error}
+                                </Typography>
+                              )}
+                            </Box>
+                          ))}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+                </Alert>
+              ) : (
+                <Alert severity="error" sx={{ 
+                  fontSize: '13px',
+                  backgroundColor: theme.colors.secondary,
+                  color: '#ffffff',
+                  '& .MuiAlert-icon': {
+                    color: '#ffffff'
+                  }
+                }}>
+                  Download failed: {downloadResult.error}
+                </Alert>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ padding: '8px 24px 16px' }}>
+          <Button 
+            variant="contained"
+            onClick={HandleCloseDownloadDialog}
+            disabled={downloading}
+            sx={{
+              backgroundColor: theme.colors.primary,
+              fontSize: '12px',
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: theme.colors.primaryHover
+              }
+            }}
+          >
+            {downloading ? 'Please wait...' : 'Close'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

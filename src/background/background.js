@@ -3,6 +3,7 @@ import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, 
 import { filterEnggSubjectsCode, getSubjectDetails } from "../helpers/enggSubjects.js";
 import { save, load } from "../utils/storage.js";
 import { getPESUDataPagination } from "../helpers/getStorageData.js";
+import { createBulkDownloadZip } from "../helpers/downloadHelper.js";
 
 // get auth cookie
 function fetchAndStorePESUSessionId() {
@@ -151,6 +152,70 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ error: error.message });
       });
     
+    return true;
+  }
+
+  if (request.action === "downloadSelectedMaterials") {
+    const { selectedItems } = request;
+    
+    if (!selectedItems || selectedItems.length === 0) {
+      sendResponse({ error: "No items selected" });
+      return true;
+    }
+
+    // Track download progress via port for real-time updates
+    let port = null;
+    if (sender.tab?.id) {
+      try {
+        port = chrome.tabs.connect(sender.tab.id, { name: "downloadProgress" });
+      } catch (e) {
+        console.log("Could not establish progress port");
+      }
+    }
+
+    const progressCallback = (progress) => {
+      if (port) {
+        try {
+          port.postMessage(progress);
+        } catch (e) {
+          // Port may be disconnected
+        }
+      }
+    };
+
+    createBulkDownloadZip(selectedItems, progressCallback)
+      .then(async (result) => {
+        // Convert blob to base64 for transfer to content script
+        const arrayBuffer = await result.blob.arrayBuffer();
+        const base64 = btoa(
+          new Uint8Array(arrayBuffer)
+            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+        );
+        
+        sendResponse({
+          success: true,
+          data: base64,
+          mimeType: 'application/zip',
+          stats: result.stats
+        });
+        
+        if (port) {
+          try {
+            port.disconnect();
+          } catch (e) {}
+        }
+      })
+      .catch((error) => {
+        console.error("Bulk download error:", error);
+        sendResponse({ error: error.message });
+        
+        if (port) {
+          try {
+            port.disconnect();
+          } catch (e) {}
+        }
+      });
+
     return true;
   }
 });
