@@ -16,3 +16,20 @@ Login and load the package for faster auth.
 Not an official package from PES University, made for only downloading resources quickly from PESU Academy.
 
 All users data is stored locally in browser. NO proxy servers or External DB connected.
+
+## Installation
+
+```bash
+npm i
+```
+
+## Building the Extension
+
+```bash
+npm run build
+```
+
+Use the `dist/` folder to load the extension.
+
+
+
