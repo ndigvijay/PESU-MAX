@@ -55,10 +55,8 @@ export const filterEnggSubjectsCode = async (subjectsArray) => {
             if (code.startsWith(prefix)) return true;
         }
 
-        if (program === "UE") {
-            for (const fyCode of firstYearCodes) {
-                if (code.startsWith(`${basePrefix}${fyCode}`)) return true;
-            }
+        for (const fyCode of firstYearCodes) {
+            if (code.startsWith(`${basePrefix}${fyCode}`)) return true;
         }
 
         return false;
