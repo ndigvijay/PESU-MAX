@@ -1,10 +1,13 @@
 import { createBulkDownloadZip } from './downloadHelper.js';
 
-export async function handleBulkDownload(selectedItems, sender, sendResponse) {
+export async function handleBulkDownload(selectedItems, options, sender, sendResponse) {
   if (!selectedItems || selectedItems.length === 0) {
     sendResponse({ error: "No items selected" });
     return;
   }
+
+  // Extract options with defaults
+  const mergeBySubject = options?.mergeBySubject || false;
 
   // Track download progress
   let port = null;
@@ -27,7 +30,7 @@ export async function handleBulkDownload(selectedItems, sender, sendResponse) {
   };
 
   try {
-    const result = await createBulkDownloadZip(selectedItems, progressCallback);
+    const result = await createBulkDownloadZip(selectedItems, progressCallback, { mergeBySubject });
     
     // Convert blob to data URL 
     const arrayBuffer = await result.blob.arrayBuffer();

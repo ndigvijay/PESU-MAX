@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { PDFDocument } from 'pdf-lib';
 import { getCourseMaterials } from './pesuAPI.js';
 import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
 import { parallelBatch } from './MiscControllers.js';
@@ -95,6 +96,64 @@ async function downloadSingleFile(url) {
   }
 }
 
+
+async function mergePDFs(pdfBlobs) {
+  const mergedPdf = await PDFDocument.create();
+
+  for (const blob of pdfBlobs) {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const pdf = await PDFDocument.load(arrayBuffer);
+      const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      copiedPages.forEach((page) => mergedPdf.addPage(page));
+    } catch (error) {
+      console.error('Error merging PDF:', error);
+      // Skip corrupted PDFs, continue with others
+    }
+  }
+
+  return await mergedPdf.save();
+}
+
+function groupBySubject(results) {
+  const grouped = {};
+
+  for (const { item, result } of results) {
+    const { subjectId, subjectName, subjectCode } = item;
+
+    if (!grouped[subjectId]) {
+      grouped[subjectId] = {
+        subjectName,
+        subjectCode,
+        pdfs: [],
+        nonPdfs: [],
+        items: []
+      };
+    }
+
+    if (result.success && result.blob) {
+      grouped[subjectId].items.push({ item, result });
+
+      if (result.extension === '.pdf') {
+        grouped[subjectId].pdfs.push({
+          blob: result.blob,
+          className: item.className,
+          unitNumber: item.unitNumber
+        });
+      } else {
+        grouped[subjectId].nonPdfs.push({
+          blob: result.blob,
+          extension: result.extension,
+          className: item.className,
+          unitNumber: item.unitNumber
+        });
+      }
+    }
+  }
+
+  return grouped;
+}
+
 // Get file content from a class material
 async function getClassMaterialFile(subjectId, classId) {
   try {
@@ -142,14 +201,16 @@ async function getClassMaterialFile(subjectId, classId) {
   }
 }
 
-export async function createBulkDownloadZip(selectedItems, progressCallback) {
+export async function createBulkDownloadZip(selectedItems, progressCallback, options = {}) {
   const zip = new JSZip();
   const totalItems = selectedItems.length;
   let completed = 0;
+  const mergeBySubject = options.mergeBySubject || false;
 
+  // Step 1: Download all files in parallel
   const results = await parallelBatch(selectedItems, async (item) => {
     const { subjectId, classId, className } = item;
-    
+
     try {
       const result = await getClassMaterialFile(subjectId, classId);
       completed++;
@@ -178,37 +239,140 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
 
   const failedItems = [];
   let failed = 0;
+  let mergedCount = 0;
+  let mergedSubjectsCount = 0;
+  let nonPdfCount = 0;
 
-  for (const { item, result } of results) {
-    const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
-    
-    if (result.success && result.blob) {
-      const safeFolderName = sanitizeFilename(subjectName);
-      const unitFolder = String(unitNumber || 1);
-      const safeFileName = sanitizeFilename(className) + result.extension;
-      const filePath = `${safeFolderName}/${unitFolder}/${safeFileName}`;
-      
-      const arrayBuffer = await result.blob.arrayBuffer();
-      const useStore = isAlreadyCompressedExt(result.extension);
-      const fileOptions = useStore
-        ? { binary: true, compression: 'STORE' }
-        : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
-
-      zip.file(filePath, arrayBuffer, fileOptions);
-    } else {
-      failed++;
-      failedItems.push({
-        subjectName,
-        subjectCode,
-        subjectId,
-        unitNumber,
-        className,
-        classId,
-        error: result.error || 'Unknown error'
+  // Step 2: Branch based on merge option
+  if (mergeBySubject) {
+    // MERGE MODE: Group by subject and merge PDFs
+    if (progressCallback) {
+      progressCallback({
+        current: totalItems,
+        total: totalItems,
+        currentItem: 'Grouping files by subject...',
+        status: 'processing'
       });
     }
+
+    const grouped = groupBySubject(results);
+    const subjectIds = Object.keys(grouped);
+
+    for (let i = 0; i < subjectIds.length; i++) {
+      const subjectId = subjectIds[i];
+      const { subjectName, subjectCode, pdfs, nonPdfs, items } = grouped[subjectId];
+      const safeFolderName = sanitizeFilename(subjectName);
+
+      if (progressCallback) {
+        progressCallback({
+          current: totalItems,
+          total: totalItems,
+          currentItem: `Processing ${subjectName}...`,
+          status: 'processing'
+        });
+      }
+
+      // Merge PDFs for this subject
+      if (pdfs.length > 0) {
+        try {
+          if (pdfs.length === 1) {
+            // Single PDF - just add it
+            const arrayBuffer = await pdfs[0].blob.arrayBuffer();
+            const fileName = `${safeFolderName}.pdf`;
+            zip.file(fileName, arrayBuffer, {
+              binary: true,
+              compression: 'STORE'
+            });
+          } else {
+            // Multiple PDFs - merge them
+            const pdfBlobs = pdfs.map(p => p.blob);
+            const mergedPdfBytes = await mergePDFs(pdfBlobs);
+            const fileName = `${safeFolderName}.pdf`;
+            zip.file(fileName, mergedPdfBytes, {
+              binary: true,
+              compression: 'STORE'
+            });
+            mergedCount += pdfs.length;
+            mergedSubjectsCount++;
+          }
+        } catch (error) {
+          console.error(`Error merging PDFs for ${subjectName}:`, error);
+          // Fall back to individual files
+          for (const pdf of pdfs) {
+            const arrayBuffer = await pdf.blob.arrayBuffer();
+            const safeFileName = sanitizeFilename(pdf.className) + '.pdf';
+            const filePath = `${safeFolderName}/${safeFileName}`;
+            zip.file(filePath, arrayBuffer, {
+              binary: true,
+              compression: 'STORE'
+            });
+          }
+        }
+      }
+
+      // Add non-PDF files to subject folder
+      for (const file of nonPdfs) {
+        const safeFileName = sanitizeFilename(file.className) + file.extension;
+        const filePath = `${safeFolderName}/${safeFileName}`;
+        const arrayBuffer = await file.blob.arrayBuffer();
+        const useStore = isAlreadyCompressedExt(file.extension);
+        const fileOptions = useStore
+          ? { binary: true, compression: 'STORE' }
+          : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
+        zip.file(filePath, arrayBuffer, fileOptions);
+        nonPdfCount++;
+      }
+    }
+
+    // Count failed items from results
+    for (const { item, result } of results) {
+      if (!result.success) {
+        failed++;
+        failedItems.push({
+          subjectName: item.subjectName,
+          subjectCode: item.subjectCode,
+          subjectId: item.subjectId,
+          unitNumber: item.unitNumber,
+          className: item.className,
+          classId: item.classId,
+          error: result.error || 'Unknown error'
+        });
+      }
+    }
+
+  } else {
+    for (const { item, result } of results) {
+      const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
+
+      if (result.success && result.blob) {
+        const safeFolderName = sanitizeFilename(subjectName);
+        const unitFolder = String(unitNumber || 1);
+        const safeFileName = sanitizeFilename(className) + result.extension;
+        const filePath = `${safeFolderName}/${unitFolder}/${safeFileName}`;
+
+        const arrayBuffer = await result.blob.arrayBuffer();
+        const useStore = isAlreadyCompressedExt(result.extension);
+        const fileOptions = useStore
+          ? { binary: true, compression: 'STORE' }
+          : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
+
+        zip.file(filePath, arrayBuffer, fileOptions);
+      } else {
+        failed++;
+        failedItems.push({
+          subjectName,
+          subjectCode,
+          subjectId,
+          unitNumber,
+          className,
+          classId,
+          error: result.error || 'Unknown error'
+        });
+      }
+    }
   }
-  
+
+  // Step 3: Generate ZIP
   if (progressCallback) {
     progressCallback({
       current: totalItems,
@@ -217,20 +381,23 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
       status: 'zipping'
     });
   }
-  
-  const zipBlob = await zip.generateAsync({ 
+
+  const zipBlob = await zip.generateAsync({
     type: 'blob',
     compression: 'DEFLATE',
     compressionOptions: { level: 4 }
   });
-  
+
   return {
     blob: zipBlob,
     stats: {
       total: totalItems,
       successful: totalItems - failed,
       failed,
-      failedItems
+      failedItems,
+      merged: mergedCount,
+      mergedSubjects: mergedSubjectsCount,
+      nonPdfCount: nonPdfCount
     }
   };
 }

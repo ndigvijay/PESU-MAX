@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "downloadSelectedMaterials") {
-    handleBulkDownload(request.selectedItems, sender, sendResponse);
+    handleBulkDownload(request.selectedItems, request.options || {}, sender, sendResponse);
     return true;
   }
 

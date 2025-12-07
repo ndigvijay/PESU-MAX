@@ -60,6 +60,7 @@ const CourseMaterial = () => {
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, currentItem: '', status: '' });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadResult, setDownloadResult] = useState(null);
+  const [mergeConfirmDialogOpen, setMergeConfirmDialogOpen] = useState(false);
 
   // Background fetch status
   const [isFetchingInBackground, setIsFetchingInBackground] = useState(false);
@@ -318,6 +319,11 @@ const CourseMaterial = () => {
       return;
     }
 
+    setMergeConfirmDialogOpen(true);
+  };
+  const startDownloadWithMergeOption = (mergeBySubject) => {
+    setMergeConfirmDialogOpen(false);
+
     // fetch all the  data from chrome extension 
     chrome.runtime.sendMessage({ action: "getAllPESUData" }, (allDataResponse) => {
       if (chrome.runtime.lastError) {
@@ -355,7 +361,10 @@ const CourseMaterial = () => {
 
       chrome.runtime.sendMessage({
         action: "downloadSelectedMaterials",
-        selectedItems
+        selectedItems,
+        options: {
+          mergeBySubject: mergeBySubject
+        }
       }, (response) => {
         setDownloading(false);
 
@@ -740,6 +749,69 @@ const CourseMaterial = () => {
         />
       )}
 
+      {/* Merge Confirmation Dialog */}
+      <Dialog
+        open={mergeConfirmDialogOpen}
+        onClose={() => setMergeConfirmDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            padding: '8px'
+          }
+        }}
+      >
+        <DialogTitle sx={{
+          color: theme.colors.secondary,
+          fontWeight: 'bold',
+          fontSize: '16px',
+          paddingBottom: '8px'
+        }}>
+          Download Options
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '14px', color: '#666', mb: 2 }}>
+            Would you like to merge all PDF files by subject?
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: '#888', mb: 1 }}>
+            <strong>Merge PDFs:</strong> All PDF files from the same subject will be combined into a single PDF. Non-PDF files (PPTX, DOCX) will be kept separate.
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: '#888' }}>
+            <strong>Keep Separate:</strong> Files will be organized by subject and unit folders 
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ padding: '16px' }}>
+          <Button
+            onClick={() => startDownloadWithMergeOption(false)}
+            sx={{
+              color: theme.colors.secondary,
+              fontSize: '12px',
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: theme.colors.secondaryLight
+              }
+            }}
+          >
+            Keep Separate
+          </Button>
+          <Button
+            onClick={() => startDownloadWithMergeOption(true)}
+            variant="contained"
+            sx={{
+              backgroundColor: theme.colors.primary,
+              fontSize: '12px',
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: theme.colors.primaryHover
+              }
+            }}
+          >
+            Merge PDFs
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Download Progress Dialog */}
       <Dialog 
         open={downloadDialogOpen} 
@@ -822,6 +894,16 @@ const CourseMaterial = () => {
                   }
                 }}>
                   Successfully downloaded {downloadResult.stats?.successful || 0} files!
+                  {downloadResult.stats?.merged > 0 && (
+                    <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff', mt: 0.5 }}>
+                      {downloadResult.stats.merged} PDFs merged into {downloadResult.stats.mergedSubjects} subject file(s)
+                    </Typography>
+                  )}
+                  {downloadResult.stats?.nonPdfCount > 0 && (
+                    <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff', mt: 0.5 }}>
+                      {downloadResult.stats.nonPdfCount} non-PDF files included separately
+                    </Typography>
+                  )}
                   {downloadResult.stats?.failed > 0 && (
                     <Box sx={{ mt: 1 }}>
                       <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>

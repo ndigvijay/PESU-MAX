@@ -20,6 +20,7 @@
     "@reduxjs/toolkit": "^2.11.0",
     "cheerio": "^1.1.2",
     "jszip": "^3.10.1",
+    "pdf-lib": "^1.17.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-redux": "^9.2.0"
