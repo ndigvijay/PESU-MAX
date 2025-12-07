@@ -11,6 +11,11 @@
       "programId": "UM"
     },
     {
+      "reference": "BBA Hons Business Analytics",
+      "dbName": "BBA (Hons) in Business Analytics",
+      "programId": "UM"
+    },
+    {
       "reference": "Law",
       "dbName": "Bachelor of Laws (BBA LLB / BA LLB)",
       "programId": "UL"
@@ -247,7 +252,7 @@
     {
       "reference": "BBA (Hons) in Business Analytics",
       "dbName": "Bachelor of Business Administration (Honours) in Business Analytics",
-      "courseCodeId": "BB"
+      "courseCodeId": "UM"
     },
     {
       "reference": "B.Com (Hons) with ACCA",

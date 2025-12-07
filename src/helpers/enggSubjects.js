@@ -47,6 +47,8 @@ export const filterEnggSubjectsCode = async (subjectsArray) => {
     
     console.log(`Filter - Program: ${program}, Year: ${year}, Branches: ${branchCodes.join(", ")}`);
 
+    const universityWidePrefix = `UZ${year}UZ`;
+
     return subjectsArray.filter((subject) => {
         const code = subject.subjectCode;
 
@@ -59,6 +61,7 @@ export const filterEnggSubjectsCode = async (subjectsArray) => {
             if (code.startsWith(`${basePrefix}${fyCode}`)) return true;
         }
 
+        if (code.startsWith(universityWidePrefix)) return true;
         return false;
     });
 }

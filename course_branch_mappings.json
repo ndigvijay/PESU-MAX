@@ -204,7 +204,8 @@
     {
       "reference": "Business Analytics",
       "dbName": "Business Analytics",
-      "courseCodeId": "BB"
+      "courseCodeId": "BB",
+      "courseCodeId2": "BN"
     },
     {
       "reference": "MBA",
