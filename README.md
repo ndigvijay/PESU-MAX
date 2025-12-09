@@ -19,6 +19,11 @@ All users data is stored locally in browser. NO proxy servers or External DB con
 
 ## Installation
 
+
+```bash
+cd PESU-MAX/
+```
+
 ```bash
 npm i
 ```
