@@ -34,6 +34,7 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import theme from "../Themes/theme.jsx";
+import { CONTENT_TYPE_OPTIONS, DEFAULT_CONTENT_TYPE_SELECTION } from "../constants/constants.js";
 
 const CourseMaterial = () => {
   const dispatch = useDispatch();
@@ -60,6 +61,10 @@ const CourseMaterial = () => {
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, currentItem: '', status: '' });
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [downloadResult, setDownloadResult] = useState(null);
+
+  // Content type
+  const [contentTypeDialogOpen, setContentTypeDialogOpen] = useState(false);
+  const [selectedContentTypes, setSelectedContentTypes] = useState(DEFAULT_CONTENT_TYPE_SELECTION);
 
   // Background fetch status
   const [isFetchingInBackground, setIsFetchingInBackground] = useState(false);
@@ -312,13 +317,35 @@ const CourseMaterial = () => {
     return selectedItems;
   };
 
-  // Handle bulk download
-  const HandleBulkDownload = async () => {
+  // Open content type selection dialog
+  const HandleBulkDownload = () => {
     if (getSelectedCount === 0) {
       return;
     }
+    setContentTypeDialogOpen(true);
+  };
 
-    // fetch all the  data from chrome extension 
+  const HandleContentTypeChange = (key) => {
+    setSelectedContentTypes(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  // Check if at least one content type is selected
+  const hasSelectedContentTypes = Object.values(selectedContentTypes).some(Boolean);
+
+  const HandleStartDownload = () => {
+    setContentTypeDialogOpen(false);
+
+    const contentTypes = CONTENT_TYPE_OPTIONS
+      .filter(opt => selectedContentTypes[opt.key])
+      .map(opt => opt.id);
+
+    if (contentTypes.length === 0) {
+      return;
+    }
+
     chrome.runtime.sendMessage({ action: "getAllPESUData" }, (allDataResponse) => {
       if (chrome.runtime.lastError) {
         console.error("Error fetching all data:", chrome.runtime.lastError.message);
@@ -336,9 +363,10 @@ const CourseMaterial = () => {
         return;
       }
 
+      const totalOperations = selectedItems.length * contentTypes.length;
       setDownloading(true);
       setDownloadDialogOpen(true);
-      setDownloadProgress({ current: 0, total: selectedItems.length, currentItem: 'Starting...', status: 'downloading' });
+      setDownloadProgress({ current: 0, total: totalOperations, currentItem: 'Starting...', status: 'downloading' });
       setDownloadResult(null);
 
       // Set up progress listener
@@ -355,7 +383,8 @@ const CourseMaterial = () => {
 
       chrome.runtime.sendMessage({
         action: "downloadSelectedMaterials",
-        selectedItems
+        selectedItems,
+        contentTypes
       }, (response) => {
         setDownloading(false);
 
@@ -368,7 +397,6 @@ const CourseMaterial = () => {
         }
 
         if (response && response.success) {
-          // Download 
           setDownloadResult({
             success: true,
             stats: response.stats
@@ -739,6 +767,97 @@ const CourseMaterial = () => {
           }}
         />
       )}
+
+      <Dialog
+        open={contentTypeDialogOpen}
+        onClose={() => setContentTypeDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '12px', padding: '8px' } }}
+      >
+        <DialogTitle sx={{ 
+          color: theme.colors.secondary, 
+          fontWeight: 'bold',
+          fontSize: '16px',
+          paddingBottom: '8px'
+        }}>
+          Select Content Types
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: '#666', fontSize: '12px', mb: 2 }}>
+            Choose which materials to download :
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {CONTENT_TYPE_OPTIONS.map((option) => (
+              <Box 
+                key={option.key}
+                onClick={() => HandleContentTypeChange(option.key)}
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: selectedContentTypes[option.key] ? theme.colors.primaryLight : 'transparent',
+                  border: `1px solid ${selectedContentTypes[option.key] ? theme.colors.primary : theme.colors.secondaryLight}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { backgroundColor: theme.colors.primaryLight, borderColor: theme.colors.primary }
+                }}
+              >
+                <Checkbox
+                  size="small"
+                  checked={selectedContentTypes[option.key]}
+                  onChange={() => HandleContentTypeChange(option.key)}
+                  sx={{
+                    padding: '2px',
+                    marginRight: '8px',
+                    color: theme.colors.primary,
+                    '&.Mui-checked': { color: theme.colors.primary }
+                  }}
+                />
+                <Typography sx={{ 
+                  fontSize: '13px', 
+                  color: selectedContentTypes[option.key] ? theme.colors.secondary : '#666',
+                  fontWeight: selectedContentTypes[option.key] ? '500' : 'normal'
+                }}>
+                  {option.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ padding: '8px 24px 16px', gap: 1 }}>
+          <Button 
+            variant="contained"
+            onClick={() => setContentTypeDialogOpen(false)}
+            sx={{
+              backgroundColor:theme.colors.secondary,
+              borderColor: theme.colors.secondaryLight,
+              color: "white",
+              fontSize: '12px',
+              textTransform: 'none',
+              '&:hover': { borderColor: theme.colors.secondary, backgroundColor: theme.colors.secondaryHover }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={HandleStartDownload}
+            disabled={!hasSelectedContentTypes}
+            startIcon={<DownloadIcon />}
+            sx={{
+              backgroundColor: theme.colors.primary,
+              fontSize: '12px',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: theme.colors.primaryHover },
+              '&.Mui-disabled': { backgroundColor: theme.colors.secondaryLight, color: '#999' }
+            }}
+          >
+            Download
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Download Progress Dialog */}
       <Dialog 

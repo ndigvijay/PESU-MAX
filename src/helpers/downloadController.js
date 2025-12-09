@@ -1,10 +1,17 @@
 import { createBulkDownloadZip } from './downloadHelper.js';
+import { CONTENT_TYPE_IDS } from './pesuAPI.js';
 
-export async function handleBulkDownload(selectedItems, sender, sendResponse) {
+const DEFAULT_CONTENT_TYPES = [CONTENT_TYPE_IDS.slides];
+
+export async function handleBulkDownload(selectedItems, contentTypes, sender, sendResponse) {
   if (!selectedItems || selectedItems.length === 0) {
     sendResponse({ error: "No items selected" });
     return;
   }
+
+  const typesToDownload = (contentTypes && contentTypes.length > 0) 
+    ? contentTypes 
+    : DEFAULT_CONTENT_TYPES;
 
   // Track download progress
   let port = null;
@@ -27,7 +34,7 @@ export async function handleBulkDownload(selectedItems, sender, sendResponse) {
   };
 
   try {
-    const result = await createBulkDownloadZip(selectedItems, progressCallback);
+    const result = await createBulkDownloadZip(selectedItems, progressCallback, typesToDownload);
     
     // Convert blob to data URL 
     const arrayBuffer = await result.blob.arrayBuffer();

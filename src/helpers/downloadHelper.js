@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { getCourseMaterials } from './pesuAPI.js';
+import { getCourseMaterials, CONTENT_TYPE_NAMES, CONTENT_TYPE_IDS } from './pesuAPI.js';
 import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
 import { parallelBatch } from './MiscControllers.js';
 
@@ -96,9 +96,9 @@ async function downloadSingleFile(url) {
 }
 
 // Get file content from a class material
-async function getClassMaterialFile(subjectId, classId) {
+async function getClassMaterialFile(subjectId, classId, contentType = 2) {
   try {
-    const result = await getCourseMaterials(subjectId, classId);
+    const result = await getCourseMaterials(subjectId, classId, contentType);
     
     if (result.type === 'binary') {
       // Direct binary download
@@ -142,51 +142,65 @@ async function getClassMaterialFile(subjectId, classId) {
   }
 }
 
-export async function createBulkDownloadZip(selectedItems, progressCallback) {
+export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2]) {
   const zip = new JSZip();
-  const totalItems = selectedItems.length;
+  // Total operations = items * content types
+  const totalOperations = selectedItems.length * contentTypes.length;
   let completed = 0;
 
-  const results = await parallelBatch(selectedItems, async (item) => {
+  // Create download tasks for each item and content type combination
+  const downloadTasks = [];
+  for (const item of selectedItems) {
+    for (const contentType of contentTypes) {
+      downloadTasks.push({ item, contentType });
+    }
+  }
+
+  const results = await parallelBatch(downloadTasks, async (task) => {
+    const { item, contentType } = task;
     const { subjectId, classId, className } = item;
+    const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'Unknown';
     
     try {
-      const result = await getClassMaterialFile(subjectId, classId);
+      const result = await getClassMaterialFile(subjectId, classId, contentType);
       completed++;
       if (progressCallback) {
         progressCallback({
           current: completed,
-          total: totalItems,
-          currentItem: className,
+          total: totalOperations,
+          currentItem: `${className} (${contentTypeName})`,
           status: 'downloading'
         });
       }
-      return { item, result };
+      return { item, contentType, result };
     } catch (error) {
       completed++;
       if (progressCallback) {
         progressCallback({
           current: completed,
-          total: totalItems,
-          currentItem: className,
+          total: totalOperations,
+          currentItem: `${className} (${contentTypeName})`,
           status: 'downloading'
         });
       }
-      return { item, result: { success: false, error: error.message } };
+      return { item, contentType, result: { success: false, error: error.message } };
     }
   }, 5);
 
   const failedItems = [];
   let failed = 0;
 
-  for (const { item, result } of results) {
+  for (const { item, contentType, result } of results) {
     const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
+    const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'PESU_Material';
     
     if (result.success && result.blob) {
       const safeFolderName = sanitizeFilename(subjectName);
       const unitFolder = String(unitNumber || 1);
+      const contentFolder = sanitizeFilename(contentTypeName);
       const safeFileName = sanitizeFilename(className) + result.extension;
-      const filePath = `${safeFolderName}/${unitFolder}/${safeFileName}`;
+      // Structure: Subject/Unit/ContentType/file.pdf
+      const filePath = `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
       
       const arrayBuffer = await result.blob.arrayBuffer();
       const useStore = isAlreadyCompressedExt(result.extension);
@@ -204,6 +218,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
         unitNumber,
         className,
         classId,
+        contentType: contentTypeName,
         error: result.error || 'Unknown error'
       });
     }
@@ -211,8 +226,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
   
   if (progressCallback) {
     progressCallback({
-      current: totalItems,
-      total: totalItems,
+      current: totalOperations,
+      total: totalOperations,
       currentItem: 'Generating ZIP file...',
       status: 'zipping'
     });
@@ -227,10 +242,11 @@ export async function createBulkDownloadZip(selectedItems, progressCallback) {
   return {
     blob: zipBlob,
     stats: {
-      total: totalItems,
-      successful: totalItems - failed,
+      total: totalOperations,
+      successful: totalOperations - failed,
       failed,
-      failedItems
+      failedItems,
+      contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)
     }
   };
 }

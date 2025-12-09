@@ -1,5 +1,21 @@
 const BASE_URL = "https://www.pesuacademy.com/Academy";
 
+export const CONTENT_TYPE_IDS = {
+  slides: 2,
+  notes: 3,
+  assignments: 5,
+  qb: 6,
+  qa: 7
+};
+
+export const CONTENT_TYPE_NAMES = {
+  2: 'Slides',
+  3: 'Notes',
+  5: 'Assignments',
+  6: 'QB',
+  7: 'QA'
+};
+
 export const getAllSemesters = async () => {
   const response = await fetch(
     `${BASE_URL}/a/studentProfilePESU/getStudentSemestersPESU`,
@@ -91,13 +107,13 @@ export const getUserProfile = async () => {
     return data;
 };
 
-export const getCourseMaterials = async (courseId, classId) => {
+export const getCourseMaterials = async (courseId, classId, contentType = 2) => {
     const params = new URLSearchParams({
       url: "studentProfilePESUAdmin",
       controllerMode: "6403",
       actionType: "60",
       selectedData: courseId,
-      id: "2",
+      id: String(contentType),
       unitid: classId
     });
 
@@ -106,12 +122,12 @@ export const getCourseMaterials = async (courseId, classId) => {
       credentials: "include",
     });
     
-    const contentType = response.headers.get('Content-Type') || '';
+    const responseContentType = response.headers.get('Content-Type') || '';
     
-    if (contentType.includes('application/pdf') || 
-        contentType.includes('application/octet-stream') ||
-        contentType.includes('application/vnd')) {
-      return { type: 'binary', data: await response.blob(), contentType };
+    if (responseContentType.includes('application/pdf') || 
+        responseContentType.includes('application/octet-stream') ||
+        responseContentType.includes('application/vnd')) {
+      return { type: 'binary', data: await response.blob(), contentType: responseContentType };
     }
     
     return { type: 'html', data: await response.text() };
