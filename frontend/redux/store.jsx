@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import sidebarReducer from './sidebarSlice.js';
+import courseMaterialReducer from './courseMaterialSlice.js';
 
 const store = configureStore({
     reducer : {
-        sidebar: sidebarReducer
+        sidebar: sidebarReducer,
+        courseMaterial: courseMaterialReducer
     }
 })
 
