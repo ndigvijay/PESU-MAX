@@ -19,6 +19,9 @@ All users data is stored locally in browser. NO proxy servers or External DB con
 
 ## Installation
 
+```bash
+git clone https://github.com/ndigvijay/PESU-MAX.git
+```
 
 ```bash
 cd PESU-MAX/
