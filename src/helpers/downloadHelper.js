@@ -196,11 +196,15 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     
     if (result.success && result.blob) {
       const safeFolderName = sanitizeFilename(subjectName);
-      const unitFolder = String(unitNumber || 1);
       const contentFolder = sanitizeFilename(contentTypeName);
       const safeFileName = sanitizeFilename(className) + result.extension;
-      // Structure: Subject/Unit/ContentType/file.pdf
-      const filePath = `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
+      let filePath;
+      if (contentFolder === 'QA' || contentFolder === 'QB') {
+        filePath = `${safeFolderName}/${contentFolder}/${safeFileName}`;
+      } else {
+        const unitFolder = String(unitNumber || 1);
+        filePath = `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
+      }
       
       const arrayBuffer = await result.blob.arrayBuffer();
       const useStore = isAlreadyCompressedExt(result.extension);
