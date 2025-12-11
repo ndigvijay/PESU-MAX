@@ -3,6 +3,7 @@ import { getPESUDataPagination, getAllPESUDataNested } from "../helpers/getStora
 import { handleBulkDownload } from "../helpers/downloadController.js";
 import { initializeDataSync } from "../initalizers/initialDataSave.js";
 import { getSemestersData } from "../helpers/MiscControllers.js";
+import { searchProfessors, getProfessorDetails } from "../services/pesuStaff.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -52,6 +53,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "getSemestersData") {
     getSemestersData()
+      .then((data) => {
+        sendResponse({ data: data });
+      })
+      .catch((error) => {
+        sendResponse({ error: error.message });
+      });
+    return true;
+  }
+
+  if (request.action === "searchProfessors") {
+    searchProfessors(request.searchQuery)
+      .then((professors) => {
+        sendResponse({ data: professors });
+      })
+      .catch((error) => {
+        sendResponse({ error: error.message });
+      });
+    return true;
+  }
+
+  if (request.action === "getProfessorDetails") {
+    getProfessorDetails(request.professorId)
       .then((data) => {
         sendResponse({ data: data });
       })

@@ -62,27 +62,53 @@ const Home = () => {
           >
             Download All PESU Materials
           </Button>)}
-          {isLoggedIn && (<Button 
-            variant="contained" 
+          {isLoggedIn && (<Button
+            variant="contained"
+            disabled
             sx={{
               backgroundColor: theme.colors.secondary,
               width: '100%',
               textAlign: 'center',
-              padding: '12px'
+              padding: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: theme.colors.secondaryLight,
+                color: theme.colors.secondary,
+                opacity: 0.7,
+              }
             }}
           >
-            Attendence Calculator
+            Attendance Calculator
           </Button>)}
-          {isLoggedIn && (<Button 
-            variant="contained" 
+          {isLoggedIn && (<Button
+            variant="contained"
+            disabled
+            sx={{
+              backgroundColor: theme.colors.secondary,
+              width: '100%',
+              textAlign: 'center',
+              padding: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: theme.colors.secondaryLight,
+                color: theme.colors.secondary,
+                opacity: 0.7,
+              }
+            }}
+          >
+            GPA Calculator
+          </Button>)}
+          {isLoggedIn && (<Button
+            variant="contained"
             sx={{
               backgroundColor: theme.colors.secondary,
               width: '100%',
               textAlign: 'center',
               padding: '12px'
             }}
+            onClick={() => {
+              dispatch(setCurrentPage("knowYourFaculty"));
+            }}
           >
-            GPA calculator
+            Know your Faculty
           </Button>)}
         </Box>
     </Box>
