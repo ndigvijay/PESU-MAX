@@ -18,6 +18,7 @@
     "@mui/icons-material": "^7.3.5",
     "@mui/material": "^7.3.5",
     "@reduxjs/toolkit": "^2.11.0",
+    "axios": "^1.13.2",
     "cheerio": "^1.1.2",
     "jszip": "^3.10.1",
     "react": "^19.2.0",
