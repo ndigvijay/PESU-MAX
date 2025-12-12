@@ -3,6 +3,8 @@
 Made to Overclock PESU-Academy
 
 <img width="410" height="801" alt="image" src="https://github.com/user-attachments/assets/fdee12c7-84f6-47b0-9c60-33cadb1f4768" />
+<img width="444" height="400" alt="image" src="https://github.com/user-attachments/assets/e2de7dc6-dff6-4154-9111-ec098270cc46" />
+
 
 
 
