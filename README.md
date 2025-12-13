@@ -1,6 +1,7 @@
 # PESU-MAX
 
-Made to Overclock PESU-Academy
+PESU-MAX is a project that can be used to download pesu academy course content very quickly.
+You can Download - Slides/Assignments/QA/QB all parellely across semesters/courses and class units.
 
 | | |
 |---|---|
