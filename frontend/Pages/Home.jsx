@@ -64,17 +64,14 @@ const Home = () => {
           </Button>)}
           {isLoggedIn && (<Button
             variant="contained"
-            disabled
             sx={{
               backgroundColor: theme.colors.secondary,
               width: '100%',
               textAlign: 'center',
-              padding: '12px',
-              '&.Mui-disabled': {
-                backgroundColor: theme.colors.secondaryLight,
-                color: theme.colors.secondary,
-                opacity: 0.7,
-              }
+              padding: '12px'
+            }}
+            onClick={() => {
+              dispatch(setCurrentPage("attendance"));
             }}
           >
             Attendance Calculator

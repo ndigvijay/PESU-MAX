@@ -4,6 +4,8 @@ import { handleBulkDownload } from "../helpers/downloadController.js";
 import { initializeDataSync } from "../initalizers/initialDataSave.js";
 import { getSemestersData } from "../helpers/MiscControllers.js";
 import { searchProfessors, getProfessorDetails } from "../services/pesuStaff.js";
+import { getAttendance } from "../helpers/pesuAPI.js";
+import { parseAttendance } from "../helpers/parser.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -81,6 +83,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => {
         sendResponse({ error: error.message });
       });
+    return true;
+  }
+
+  if (request.action === "getAttendance") {
+    getAttendance(request.semesterId)
+      .then((html) => parseAttendance(html))
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
     return true;
   }
 });

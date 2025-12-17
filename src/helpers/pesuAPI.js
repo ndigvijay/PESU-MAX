@@ -107,6 +107,58 @@ export const getUserProfile = async () => {
     return data;
 };
 
+export const getCsrfToken = async () => {
+  const response = await fetch(`${BASE_URL}/s/studentProfilePESU`, {
+    method: "GET",
+    credentials: "include",
+  });
+  
+  const html = await response.text();
+  
+  const metaMatch = html.match(/<meta\s+name="_csrf"\s+content="([^"]+)"/i);
+  if (metaMatch) return metaMatch[1];
+  
+  const inputMatch = html.match(/<input[^>]+name="_csrf"[^>]+value="([^"]+)"/i);
+  if (inputMatch) return inputMatch[1];
+  
+  const altMetaMatch = html.match(/<meta\s+content="([^"]+)"\s+name="_csrf"/i);
+  if (altMetaMatch) return altMetaMatch[1];
+  
+  return null;
+};
+
+export const getAttendance = async (semesterId) => {
+  // get the CSRF token
+  const csrfToken = await getCsrfToken();
+  
+  const formBody = new URLSearchParams({
+    controllerMode: "6407",
+    actionType: "8",
+    batchClassId: semesterId,
+    menuId: "660"
+  });
+
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Requested-With": "XMLHttpRequest"
+  };
+  
+  // Add CSRF token 
+  if (csrfToken) {
+    headers["X-CSRF-Token"] = csrfToken;
+  }
+
+  const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: formBody.toString()
+  });
+
+  const data = await response.text();
+  return data;
+};
+
 export const getCourseMaterials = async (courseId, classId, contentType = 2) => {
     const params = new URLSearchParams({
       url: "studentProfilePESUAdmin",

@@ -162,6 +162,41 @@ export const resolveDownloadUrl = (url) => {
   }
 };
 
+export const parseAttendance = (htmlData) => {
+  if (!htmlData || typeof htmlData !== 'string') return [];
+  
+  const $ = load(htmlData);
+  const attendance = [];
+  
+  $('tbody#subjetInfo tr').each((index, row) => {
+    const cells = $(row).find('td');
+    if (cells.length < 4) return;
+    
+    const courseCode = $(cells[0]).text().trim();
+    const courseName = $(cells[1]).text().trim();
+    const classesText = $(cells[2]).text().trim(); // "65/80" or "NA"
+    const percentageText = $(cells[3]).text().trim();  // "81" or "NA"
+    
+    let attended = null, total = null;
+    if (classesText !== 'NA' && classesText.includes('/')) {
+      const [att, tot] = classesText.split('/');
+      attended = parseInt(att, 10);
+      total = parseInt(tot, 10);
+    }
+    
+    attendance.push({
+      courseCode,
+      courseName,
+      attended,
+      total,
+      percentage: percentageText === 'NA' ? null : parseInt(percentageText, 10),
+      classesText
+    });
+  });
+  
+  return attendance;
+};
+
 const PROFILE_HEADER_TO_KEY = {
   "Name": "name",
   "PRN": "prn",

@@ -7,6 +7,7 @@ import theme from '../Themes/theme.jsx';
 import Home from '../Pages/Home.jsx';
 import CourseMaterial from '../Pages/CourseMaterial.jsx';
 import KnowYourFaculty from '../Pages/KnowYourFaculty.jsx';
+import Attendance from '../Pages/Attendance.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 
 
@@ -93,8 +94,8 @@ const Sidebar = () => {
                 {currentPage === "home" && <Home />}
                 {currentPage === "courseMaterial" && <CourseMaterial />}
                 {currentPage === "knowYourFaculty" && <KnowYourFaculty />}
-                {/* {currentPage === "attendence" && <Attendence />}
-                {currentPage === "GPA" && <Grades />} */}
+                {currentPage === "attendance" && <Attendance />}
+                {/* {currentPage === "GPA" && <Grades />} */}
 
 
             </Box>
