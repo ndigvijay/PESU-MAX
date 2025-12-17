@@ -121,7 +121,6 @@ export async function fetchAllGpaData() {
     }
 
     const gpaResults = [];
-    let currentCgpa = 0;
 
     for (const sem of semesters) {
       try {
@@ -137,10 +136,6 @@ export async function fetchAllGpaData() {
           cgpa: data.cgpa,
           fromApi: true
         });
-
-        if (data.cgpa > 0) {
-          currentCgpa = data.cgpa;
-        }
       } catch (err) {
         console.error(`Error fetching GPA for semester ${sem.number}:`, err);
         gpaResults.push({
@@ -155,7 +150,16 @@ export async function fetchAllGpaData() {
       }
     }
 
+    // Sort by semester 
     gpaResults.sort((a, b) => a.semester - b.semester);
+
+    let currentCgpa = 0;
+    for (let i = gpaResults.length - 1; i >= 0; i--) {
+      if (gpaResults[i].cgpa > 0) {
+        currentCgpa = gpaResults[i].cgpa;
+        break;
+      }
+    }
 
     save("gpaData", {
       semesters: gpaResults,
@@ -164,6 +168,7 @@ export async function fetchAllGpaData() {
     });
 
     console.log("GPA data saved:", gpaResults);
+    console.log("Current CGPA", currentCgpa);
   } catch (err) {
     console.error("Error fetching GPA data:", err);
   }
