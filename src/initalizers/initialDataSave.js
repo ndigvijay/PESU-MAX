@@ -1,5 +1,5 @@
-import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile } from "../helpers/pesuAPI.js";
-import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile } from "../helpers/parser.js";
+import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile, getSemesterGpa } from "../helpers/pesuAPI.js";
+import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile, parseGpaData } from "../helpers/parser.js";
 import { filterEnggSubjectsCode } from "../helpers/enggSubjects.js";
 import { save, load } from "../utils/storage.js";
 import { parallelBatch } from "../helpers/MiscControllers.js";
@@ -112,12 +112,70 @@ export async function fetchSemesters() {
   }
 }
 
+export async function fetchAllGpaData() {
+  try {
+    const semesters = await load("semestersData");
+    if (!semesters?.length) {
+      console.log("No semesters data available for GPA fetch");
+      return;
+    }
+
+    const gpaResults = [];
+    let currentCgpa = 0;
+
+    for (const sem of semesters) {
+      try {
+        const html = await getSemesterGpa(sem.value);
+        const data = parseGpaData(html);
+        
+        gpaResults.push({
+          semester: sem.number,
+          semesterId: sem.value,
+          credits: data.earnedCredits,
+          totalCredits: data.totalCredits,
+          sgpa: data.sgpa,
+          cgpa: data.cgpa,
+          fromApi: true
+        });
+
+        if (data.cgpa > 0) {
+          currentCgpa = data.cgpa;
+        }
+      } catch (err) {
+        console.error(`Error fetching GPA for semester ${sem.number}:`, err);
+        gpaResults.push({
+          semester: sem.number,
+          semesterId: sem.value,
+          credits: 0,
+          totalCredits: 0,
+          sgpa: 0,
+          cgpa: 0,
+          fromApi: true
+        });
+      }
+    }
+
+    gpaResults.sort((a, b) => a.semester - b.semester);
+
+    save("gpaData", {
+      semesters: gpaResults,
+      currentCgpa: currentCgpa,
+      fetchedAt: Date.now()
+    });
+
+    console.log("GPA data saved:", gpaResults);
+  } catch (err) {
+    console.error("Error fetching GPA data:", err);
+  }
+}
+
 // In-memory locks 
 const fetchLocks = {
   sessionId: false,
   userProfile: false,
   semesters: false,
-  pesuData: false
+  pesuData: false,
+  gpaData: false
 };
 
 // get auth cookie
@@ -138,11 +196,12 @@ function fetchAndStorePESUSessionId() {
 
 // Check and fetch missing data 
 async function syncMissingData() {
-  let [sessionId, userProfile, semesters, pesuData] = await Promise.all([
+  let [sessionId, userProfile, semesters, pesuData, gpaData] = await Promise.all([
     load("JSESSIONID"),
     load("userProfile"),
     load("semestersData"),
-    load("pesuData")
+    load("pesuData"),
+    load("gpaData")
   ]);
 
   // Always fetch session ID if missing
@@ -175,6 +234,15 @@ async function syncMissingData() {
       fetchAllPESUData().finally(() => {
         fetchLocks.pesuData = false;
         chrome.storage.local.set({ fetchStatus: { pesuData: false } });
+      });
+    }
+    if (semesters && !gpaData && !fetchLocks.gpaData) {
+      fetchLocks.gpaData = true;
+      chrome.storage.local.set({ fetchStatus: { gpaData: true } });
+      
+      fetchAllGpaData().finally(() => {
+        fetchLocks.gpaData = false;
+        chrome.storage.local.set({ fetchStatus: { gpaData: false } });
       });
     }
   }
@@ -210,4 +278,23 @@ export function initializeDataSync() {
 
   // Run immediately on load
   syncMissingData();
+
+  globalThis.debugPESU = {
+    fetchAllGpaData,
+    fetchSemesters,
+    syncMissingData,
+    testGpaFetch: async (semesterId) => {
+      const { getSemesterGpa } = await import("../helpers/pesuAPI.js");
+      const { parseGpaData } = await import("../helpers/parser.js");
+      const html = await getSemesterGpa(semesterId);
+      console.log("Raw HTML:", html);
+      const parsed = parseGpaData(html);
+      console.log("Parsed:", parsed);
+      return { html, parsed };
+    },
+    checkStorage: () => {
+      chrome.storage.local.get(["gpaData", "semestersData", "userProfile"], console.log);
+    }
+  };
+  console.log("Debug functions available: globalThis.debugPESU");
 }

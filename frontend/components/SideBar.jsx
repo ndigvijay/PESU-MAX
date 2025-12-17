@@ -8,6 +8,7 @@ import Home from '../Pages/Home.jsx';
 import CourseMaterial from '../Pages/CourseMaterial.jsx';
 import KnowYourFaculty from '../Pages/KnowYourFaculty.jsx';
 import Attendance from '../Pages/Attendance.jsx';
+import GPACalculator from '../Pages/GPACalculator.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
 
 
@@ -95,7 +96,7 @@ const Sidebar = () => {
                 {currentPage === "courseMaterial" && <CourseMaterial />}
                 {currentPage === "knowYourFaculty" && <KnowYourFaculty />}
                 {currentPage === "attendance" && <Attendance />}
-                {/* {currentPage === "GPA" && <Grades />} */}
+                {currentPage === "gpaCalculator" && <GPACalculator />}
 
 
             </Box>

@@ -197,6 +197,74 @@ export const parseAttendance = (htmlData) => {
   return attendance;
 };
 
+export const parseGpaData = (htmlData) => {
+  
+  if (!htmlData || typeof htmlData !== 'string') {
+    console.warn("[PARSE-GPA] Invalid input - returning zeros");
+    console.log("[PARSE-GPA] ========================================");
+    return { earnedCredits: 0, totalCredits: 0, sgpa: 0, cgpa: 0 };
+  }
+
+  const $ = load(htmlData);
+  
+  let earnedCredits = 0;
+  let totalCredits = 0;
+  let sgpa = 0;
+  let cgpa = 0;
+
+  
+  const infoBar = $('.info-contents .dashboard-info-bar').first();
+  
+  if (infoBar.length === 0) {
+    console.log("Trying alternative selectors...");
+    console.log("'.dashboard-info-bar' direct:", $('.dashboard-info-bar').length, "found");
+    
+    const allH6 = $('h6');
+    console.log("All h6 elements found:", allH6.length);
+    allH6.each((i, el) => {
+      console.log(`h6[${i}]:`, $(el).text().trim());
+    });
+    
+    const infoDivs = $('[class*="info"]');
+    console.log("Divs with 'info' in class:", infoDivs.length);
+    infoDivs.each((i, el) => {
+      if (i < 10) {
+        console.log(`info div[${i}] class:`, $(el).attr('class'));
+      }
+    });
+  }
+
+  const childDivs = infoBar.find('> div');
+  console.log("Child divs in infoBar:", childDivs.length);
+  
+  childDivs.each((i, div) => {
+    const h6Text = $(div).find('h6').text().trim();
+    const value = $(div).clone().children().remove().end().text().trim();
+    
+    console.log(`Div ${i}: h6="${h6Text}", value="${value}"`);
+    
+    if (h6Text === 'Earned Credits') {
+      const match = value.match(/([\d.]+)\s*\/\s*([\d.]+)/);
+      if (match) {
+        earnedCredits = parseFloat(match[1]) || 0;
+        totalCredits = parseFloat(match[2]) || 0;
+        console.log(`Parsed credits: ${earnedCredits}/${totalCredits}`);
+      }
+    } else if (h6Text === 'SGPA') {
+      sgpa = parseFloat(value) || 0;
+      console.log(`Parsed SGPA: ${sgpa}`);
+    } else if (h6Text === 'CGPA') {
+      cgpa = parseFloat(value) || 0;
+      console.log(`Parsed CGPA: ${cgpa}`);
+    }
+  });
+
+  const result = { earnedCredits, totalCredits, sgpa, cgpa };
+  console.log("Final result:", JSON.stringify(result));
+  
+  return result;
+};
+
 const PROFILE_HEADER_TO_KEY = {
   "Name": "name",
   "PRN": "prn",
