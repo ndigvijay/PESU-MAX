@@ -1,7 +1,6 @@
 # PESU-MAX
 
-PESU-MAX is a project that can be used to download pesu academy course content very quickly.
-You can Download - Slides/Assignments/QA/QB all parellely across semesters/courses and class units.
+PESU-MAX is a tool that makes the best use of pesuacademy. 
 
 ## DEMO VIDEO
 https://github.com/user-attachments/assets/f326dab6-3d37-4be4-a399-8b66b4d2739f
