@@ -43,8 +43,10 @@ export const downloadSelectedMaterials = createAsyncThunk(
       if (allData && Array.isArray(allData)) {
         for (const subject of allData) {
           (subject.units || []).forEach((unit, unitIndex) => {
+            let classIndexInUnit = 0;
             for (const cls of (unit.classes || [])) {
               if (selectedClasses[cls.id]) {
+                classIndexInUnit++;
                 selectedItems.push({
                   subjectId: subject.id,
                   subjectCode: subject.subjectCode,
@@ -53,7 +55,8 @@ export const downloadSelectedMaterials = createAsyncThunk(
                   unitName: unit.name,
                   unitNumber: unitIndex + 1,
                   classId: cls.id,
-                  className: cls.className
+                  className: cls.className,
+                  classIndex: classIndexInUnit
                 });
               }
             }

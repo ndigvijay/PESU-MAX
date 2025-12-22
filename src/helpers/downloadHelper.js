@@ -204,7 +204,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
   let totalFiles = 0;
 
   for (const { item, contentType, filesArray } of results) {
-    const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
+    const { subjectName, subjectCode, subjectId, unitNumber, className, classId, classIndex } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'PESU_Material';
 
     if (!filesArray || !Array.isArray(filesArray) || filesArray.length === 0) {
@@ -245,13 +245,17 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
         const safeFolderName = sanitizeFilename(subjectName);
         const contentFolder = sanitizeFilename(contentTypeName);
 
+        const fileNumber = i + 1;
+        const classIdx = classIndex || 1;
+        const numberingPrefix = `${unitNumber}.${classIdx}.${fileNumber}`;
+
         let baseFileName;
         if (fileResult.name) {
-          baseFileName = sanitizeFilename(fileResult.name);
+          baseFileName = `${numberingPrefix}_${sanitizeFilename(fileResult.name)}`;
         } else if (filesArray.length > 1) {
-          baseFileName = sanitizeFilename(className) + `_${i + 1}`;
+          baseFileName = `${numberingPrefix}_${sanitizeFilename(className)}`;
         } else {
-          baseFileName = sanitizeFilename(className);
+          baseFileName = `${numberingPrefix}_${sanitizeFilename(className)}`;
         }
         const safeFileName = baseFileName + fileResult.extension;
 
@@ -321,8 +325,10 @@ export function getSelectedClassesInfo(selectedClasses, pesuData) {
   
   for (const subject of pesuData.items) {
     (subject.units || []).forEach((unit, unitIndex) => {
+      let classIndexInUnit = 0;
       for (const cls of (unit.classes || [])) {
         if (selectedClasses[cls.id]) {
+          classIndexInUnit++;
           selectedItems.push({
             subjectId: subject.id,
             subjectCode: subject.subjectCode,
@@ -331,7 +337,8 @@ export function getSelectedClassesInfo(selectedClasses, pesuData) {
             unitName: unit.name,
             unitNumber: unitIndex + 1,
             classId: cls.id,
-            className: cls.className
+            className: cls.className,
+            classIndex: classIndexInUnit
           });
         }
       }
