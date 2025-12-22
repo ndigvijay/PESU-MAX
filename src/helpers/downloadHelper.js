@@ -99,7 +99,11 @@ async function downloadSingleFile(url) {
 async function getClassMaterialFile(subjectId, classId, contentType = 2) {
   try {
     const result = await getCourseMaterials(subjectId, classId, contentType);
-    
+
+    if (!result) {
+      return [{ success: false, error: 'No response from server' }];
+    }
+
     if (result.type === 'binary') {
       // Direct binary download
       let extension = '.pdf';
@@ -111,34 +115,42 @@ async function getClassMaterialFile(subjectId, classId, contentType = 2) {
           }
         }
       }
-      return { blob: result.data, extension, success: true };
+      return [{ blob: result.data, extension, success: true, name: null }];
     }
-    
     if (result.type === 'html') {
       // Parse HTML to get download links
       const downloadLinks = parseDownloadLinks(result.data);
-      
       if (downloadLinks.length === 0) {
-        return { success: false, error: 'No download links found' };
+        return [{ success: false, error: 'No download links found in HTML' }];
       }
-      
-      // Try to download the first available link
-      for (const link of downloadLinks) {
-        const fullUrl = resolveDownloadUrl(link.url);
-        const downloadResult = await downloadSingleFile(fullUrl);
-        
-        if (downloadResult.success) {
-          return downloadResult;
+
+      const downloadPromises = downloadLinks.map(async (link) => {
+        try {
+          const fullUrl = resolveDownloadUrl(link.url);
+          const downloadResult = await downloadSingleFile(fullUrl);
+          return {
+            ...downloadResult,
+            name: link.name || null 
+          };
+        } catch (err) {
+          return { success: false, error: err.message, name: link.name || null };
         }
+      });
+
+      const results = await Promise.all(downloadPromises);
+      const successfulDownloads = results.filter(r => r.success);
+
+      if (successfulDownloads.length === 0) {
+        return results.length > 0 ? results : [{ success: false, error: 'All download links failed' }];
       }
-      
-      return { success: false, error: 'All download links failed' };
+
+      return successfulDownloads;
     }
-    
-    return { success: false, error: 'Unknown response type' };
+
+    return [{ success: false, error: `Unknown response type: ${result.type}` }];
   } catch (error) {
     console.error(`Failed to get material for class ${classId}:`, error);
-    return { success: false, error: error.message };
+    return [{ success: false, error: error.message || 'Unknown error occurred' }];
   }
 }
 
@@ -160,9 +172,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     const { item, contentType } = task;
     const { subjectId, classId, className } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'Unknown';
-    
+
     try {
-      const result = await getClassMaterialFile(subjectId, classId, contentType);
+      const filesArray = await getClassMaterialFile(subjectId, classId, contentType);
       completed++;
       if (progressCallback) {
         progressCallback({
@@ -172,7 +184,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           status: 'downloading'
         });
       }
-      return { item, contentType, result };
+      return { item, contentType, filesArray };
     } catch (error) {
       completed++;
       if (progressCallback) {
@@ -183,37 +195,19 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           status: 'downloading'
         });
       }
-      return { item, contentType, result: { success: false, error: error.message } };
+      return { item, contentType, filesArray: [{ success: false, error: error.message }] };
     }
   }, 5);
 
   const failedItems = [];
   let failed = 0;
+  let totalFiles = 0;
 
-  for (const { item, contentType, result } of results) {
+  for (const { item, contentType, filesArray } of results) {
     const { subjectName, subjectCode, subjectId, unitNumber, className, classId } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'PESU_Material';
-    
-    if (result.success && result.blob) {
-      const safeFolderName = sanitizeFilename(subjectName);
-      const contentFolder = sanitizeFilename(contentTypeName);
-      const safeFileName = sanitizeFilename(className) + result.extension;
-      let filePath;
-      if (contentFolder === 'QA' || contentFolder === 'QB') {
-        filePath = `${safeFolderName}/${contentFolder}/${safeFileName}`;
-      } else {
-        const unitFolder = String(unitNumber || 1);
-        filePath = `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
-      }
-      
-      const arrayBuffer = await result.blob.arrayBuffer();
-      const useStore = isAlreadyCompressedExt(result.extension);
-      const fileOptions = useStore
-        ? { binary: true, compression: 'STORE' }
-        : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
 
-      zip.file(filePath, arrayBuffer, fileOptions);
-    } else {
+    if (!filesArray || !Array.isArray(filesArray) || filesArray.length === 0) {
       failed++;
       failedItems.push({
         subjectName,
@@ -223,8 +217,72 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
         className,
         classId,
         contentType: contentTypeName,
-        error: result.error || 'Unknown error'
+        error: 'No files returned'
       });
+      continue;
+    }
+
+    for (let i = 0; i < filesArray.length; i++) {
+      const fileResult = filesArray[i];
+
+      if (!fileResult) {
+        failed++;
+        failedItems.push({
+          subjectName,
+          subjectCode,
+          subjectId,
+          unitNumber,
+          className,
+          classId,
+          contentType: contentTypeName,
+          error: 'Invalid file result'
+        });
+        continue;
+      }
+
+      if (fileResult.success && fileResult.blob) {
+        totalFiles++;
+        const safeFolderName = sanitizeFilename(subjectName);
+        const contentFolder = sanitizeFilename(contentTypeName);
+
+        let baseFileName;
+        if (fileResult.name) {
+          baseFileName = sanitizeFilename(fileResult.name);
+        } else if (filesArray.length > 1) {
+          baseFileName = sanitizeFilename(className) + `_${i + 1}`;
+        } else {
+          baseFileName = sanitizeFilename(className);
+        }
+        const safeFileName = baseFileName + fileResult.extension;
+
+        let filePath;
+        if (contentFolder === 'QA' || contentFolder === 'QB') {
+          filePath = `${safeFolderName}/${contentFolder}/${safeFileName}`;
+        } else {
+          const unitFolder = String(unitNumber || 1);
+          filePath = `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
+        }
+
+        const arrayBuffer = await fileResult.blob.arrayBuffer();
+        const useStore = isAlreadyCompressedExt(fileResult.extension);
+        const fileOptions = useStore
+          ? { binary: true, compression: 'STORE' }
+          : { binary: true, compression: 'DEFLATE', compressionOptions: { level: 4 } };
+
+        zip.file(filePath, arrayBuffer, fileOptions);
+      } else if (!fileResult.success) {
+        failed++;
+        failedItems.push({
+          subjectName,
+          subjectCode,
+          subjectId,
+          unitNumber,
+          className,
+          classId,
+          contentType: contentTypeName,
+          error: fileResult.error || 'Unknown error'
+        });
+      }
     }
   }
   

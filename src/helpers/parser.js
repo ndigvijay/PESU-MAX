@@ -115,10 +115,12 @@ export const parseDownloadLinks = (htmlData) => {
     const onclick = $(element).attr('onclick') || '';
     const match = onclick.match(/downloadcoursedoc\('([^']+)'/);
     if (match) {
+      const linkText = $(element).text().trim();
       downloadLinks.push({
         url: `/Academy/s/referenceMeterials/downloadcoursedoc/${match[1]}`,
         type: 'coursedoc',
-        docId: match[1]
+        docId: match[1],
+        name: linkText || null
       });
     }
   });
@@ -129,9 +131,11 @@ export const parseDownloadLinks = (htmlData) => {
       const match = onclick.match(/loadIframe\('([^']+)'/);
       if (match) {
         const url = match[1].split('#')[0]; 
+        const linkText = $(element).text().trim();
         downloadLinks.push({
           url: url,
-          type: 'slidecoursedoc'
+          type: 'slidecoursedoc', 
+          name: linkText || null
         });
       }
     }
@@ -140,9 +144,11 @@ export const parseDownloadLinks = (htmlData) => {
   $('a[href*="referenceMeterials"], a[href*="download"]').each((index, element) => {
     const href = $(element).attr('href') || '';
     if (href.includes('downloadslidecoursedoc') || href.includes('downloadcoursedoc')) {
+      const linkText = $(element).text().trim();
       downloadLinks.push({
         url: href.split('#')[0], 
-        type: 'direct'
+        type: 'direct',
+        name: linkText || null
       });
     }
   });
