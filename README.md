@@ -8,6 +8,8 @@ https://github.com/user-attachments/assets/f326dab6-3d37-4be4-a399-8b66b4d2739f
 
 ## NOTE
 
+*The bug for some slides/notes being skipped is fixed, please take the latest pull*
+
 Login and load the package for faster auth.
 
 Not an official package from PES University, made for only downloading resources quickly from PESU Academy.
