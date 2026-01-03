@@ -108,83 +108,48 @@ export const getUserProfile = async () => {
 };
 
 export const getCsrfToken = async () => {
-  console.log("[CSRF] Fetching CSRF token from studentProfilePESU...");
-  
   try {
     const response = await fetch(`${BASE_URL}/s/studentProfilePESU`, {
       method: "GET",
       credentials: "include",
     });
     
-    console.log("[CSRF] Response status:", response.status);
-    console.log("[CSRF] Response headers:", Object.fromEntries(response.headers.entries()));
-    
     const html = await response.text();
-    console.log("[CSRF] Response length:", html.length);
-    
-    const allMetaTags = html.match(/<meta[^>]+>/gi) || [];
-    console.log("[CSRF] All meta tags found:", allMetaTags.length);
-    allMetaTags.forEach((tag, i) => {
-      if (tag.toLowerCase().includes('csrf') || tag.toLowerCase().includes('token')) {
-        console.log(`[CSRF] Meta tag ${i}:`, tag);
-      }
-    });
-    
-    const allInputTags = html.match(/<input[^>]*csrf[^>]*>/gi) || [];
-    console.log("[CSRF] CSRF input tags found:", allInputTags.length);
-    allInputTags.forEach((tag, i) => {
-      console.log(`[CSRF] Input tag ${i}:`, tag);
-    });
     
     const metaMatch = html.match(/<meta\s+name="_csrf"\s+content="([^"]+)"/i);
     if (metaMatch) {
-      console.log("[CSRF] Found via meta name pattern:", metaMatch[1]);
       return metaMatch[1];
     }
     
     const inputMatch = html.match(/<input[^>]+name="_csrf"[^>]+value="([^"]+)"/i);
     if (inputMatch) {
-      console.log("[CSRF] Found via input pattern:", inputMatch[1]);
       return inputMatch[1];
     }
     
     const inputMatchReversed = html.match(/<input[^>]+value="([^"]+)"[^>]+name="_csrf"/i);
     if (inputMatchReversed) {
-      console.log("[CSRF] Found via input pattern (reversed):", inputMatchReversed[1]);
       return inputMatchReversed[1];
     }
     
     const altMetaMatch = html.match(/<meta\s+content="([^"]+)"\s+name="_csrf"/i);
     if (altMetaMatch) {
-      console.log("[CSRF] Found via alt meta pattern:", altMetaMatch[1]);
       return altMetaMatch[1];
     }
     
     const headerMatch = html.match(/_csrf['"]\s*(?:content|value)\s*=\s*['"]([^'"]+)['"]/i);
     if (headerMatch) {
-      console.log("[CSRF] Found via header pattern:", headerMatch[1]);
       return headerMatch[1];
     }
     
     const hiddenInputMatch = html.match(/<input\s+type="hidden"\s+name="_csrf"\s+value="([^"]+)"/i);
     if (hiddenInputMatch) {
-      console.log("[CSRF] Found via hidden input pattern:", hiddenInputMatch[1]);
       return hiddenInputMatch[1];
     }
     
     const anyInputCsrf = html.match(/name="_csrf"[^>]*value="([^"]+)"/i) || 
                          html.match(/value="([^"]+)"[^>]*name="_csrf"/i);
     if (anyInputCsrf) {
-      console.log("[CSRF] Found via any input csrf pattern:", anyInputCsrf[1]);
       return anyInputCsrf[1];
-    }
-    
-    console.log("[CSRF] No CSRF token found! HTML snippet (first 2000 chars):");
-    console.log(html.substring(0, 2000));
-    console.log("[CSRF] ... HTML snippet (around head/form area):");
-    const headMatch = html.match(/<head[^>]*>[\s\S]{0,3000}/i);
-    if (headMatch) {
-      console.log(headMatch[0]);
     }
     
     return null;
@@ -233,12 +198,7 @@ export const getAttendance = async (semesterId) => {
 };
 
 export const getSemesterGpa = async (semesterId) => {
-  console.log("[GPA] ========================================");
-  console.log("[GPA] Fetching GPA for semester:", semesterId);
-  
   const csrfToken = await getCsrfToken();
-  console.log("[GPA] CSRF token received:", csrfToken ? `"${csrfToken.substring(0, 20)}..."` : "NULL");
-  console.log("[GPA] CSRF token length:", csrfToken ? csrfToken.length : 0);
   const formParams = {
     controllerMode: "6402",
     actionType: "8",

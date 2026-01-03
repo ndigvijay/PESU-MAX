@@ -6,9 +6,6 @@ function fetchAndStorePESUSessionId() {
     (cookie) => {
       if (cookie) {
         save("JSESSIONID", cookie.value);
-        console.log("Stored JSESSIONID:", cookie.value);
-      } else {
-        console.log("JSESSIONID cookie not found");
       }
     }
   );

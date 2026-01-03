@@ -44,8 +44,6 @@ export const filterEnggSubjectsCode = async (subjectsArray) => {
     
     const firstYearCodes = getFirstYearCodes();
     const basePrefix = `${program}${year}`;
-    
-    console.log(`Filter - Program: ${program}, Year: ${year}, Branches: ${branchCodes.join(", ")}`);
 
     const universityWidePrefix = `UZ${year}UZ`;
 

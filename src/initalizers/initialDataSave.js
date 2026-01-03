@@ -161,15 +161,13 @@ export async function fetchAllGpaData() {
       }
     }
 
-    save("gpaData", {
-      semesters: gpaResults,
-      currentCgpa: currentCgpa,
-      fetchedAt: Date.now()
-    });
+     save("gpaData", {
+       semesters: gpaResults,
+       currentCgpa: currentCgpa,
+       fetchedAt: Date.now()
+     });
 
-    console.log("GPA data saved:", gpaResults);
-    console.log("Current CGPA", currentCgpa);
-  } catch (err) {
+   } catch (err) {
     console.error("Error fetching GPA data:", err);
   }
 }
@@ -190,9 +188,6 @@ function fetchAndStorePESUSessionId() {
     (cookie) => {
       if (cookie) {
         save("JSESSIONID", cookie.value);
-        console.log("Stored JSESSIONID:", cookie.value);
-      } else {
-        console.log("JSESSIONID cookie not found");
       }
       fetchLocks.sessionId = false; // Release lock
     }
@@ -292,14 +287,11 @@ export function initializeDataSync() {
       const { getSemesterGpa } = await import("../helpers/pesuAPI.js");
       const { parseGpaData } = await import("../helpers/parser.js");
       const html = await getSemesterGpa(semesterId);
-      console.log("Raw HTML:", html);
       const parsed = parseGpaData(html);
-      console.log("Parsed:", parsed);
       return { html, parsed };
     },
     checkStorage: () => {
       chrome.storage.local.get(["gpaData", "semestersData", "userProfile"], console.log);
     }
   };
-  console.log("Debug functions available: globalThis.debugPESU");
 }
