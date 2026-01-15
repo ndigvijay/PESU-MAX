@@ -8,7 +8,7 @@ export const GRADE_VALUES = {
   C: 7,
   D: 6,
   E: 5,
-  F: 4
+  F: 0
 };
 
 export const GRADE_COLORS = {
