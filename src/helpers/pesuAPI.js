@@ -1,4 +1,9 @@
 const BASE_URL = "https://www.pesuacademy.com/Academy";
+const CSRF_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let cachedCsrfToken = null;
+let cachedCsrfFetchedAt = 0;
+let csrfTokenPromise = null;
 
 export const CONTENT_TYPE_IDS = {
   slides: 2,
@@ -33,6 +38,7 @@ export const getAllSemesters = async () => {
 
 
 export const getSemesterDetails = async (semesterId) => {
+  const csrfToken = await getCsrfToken();
   const formBody = new URLSearchParams({
     controllerMode: "6403",
     actionType: "38",
@@ -40,18 +46,23 @@ export const getSemesterDetails = async (semesterId) => {
     menuId: "653"
   });
 
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Requested-With": "XMLHttpRequest"
+  };
+
+  if (csrfToken) {
+    headers["X-CSRF-TOKEN"] = csrfToken;
+  }
+
   const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-Requested-With": "XMLHttpRequest"
-    },
+    headers,
     body: formBody.toString()
   });
 
-  const json = await response.json();
-  return json;
+  return response.text();
 };
 
 
@@ -108,6 +119,16 @@ export const getUserProfile = async () => {
 };
 
 export const getCsrfToken = async () => {
+  const now = Date.now();
+  if (cachedCsrfToken && now - cachedCsrfFetchedAt < CSRF_CACHE_TTL_MS) {
+    return cachedCsrfToken;
+  }
+
+  if (csrfTokenPromise) {
+    return csrfTokenPromise;
+  }
+
+  csrfTokenPromise = (async () => {
   try {
     const response = await fetch(`${BASE_URL}/s/studentProfilePESU`, {
       method: "GET",
@@ -118,45 +139,64 @@ export const getCsrfToken = async () => {
     
     const metaMatch = html.match(/<meta\s+name="_csrf"\s+content="([^"]+)"/i);
     if (metaMatch) {
-      return metaMatch[1];
+      cachedCsrfToken = metaMatch[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const inputMatch = html.match(/<input[^>]+name="_csrf"[^>]+value="([^"]+)"/i);
     if (inputMatch) {
-      return inputMatch[1];
+      cachedCsrfToken = inputMatch[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const inputMatchReversed = html.match(/<input[^>]+value="([^"]+)"[^>]+name="_csrf"/i);
     if (inputMatchReversed) {
-      return inputMatchReversed[1];
+      cachedCsrfToken = inputMatchReversed[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const altMetaMatch = html.match(/<meta\s+content="([^"]+)"\s+name="_csrf"/i);
     if (altMetaMatch) {
-      return altMetaMatch[1];
+      cachedCsrfToken = altMetaMatch[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const headerMatch = html.match(/_csrf['"]\s*(?:content|value)\s*=\s*['"]([^'"]+)['"]/i);
     if (headerMatch) {
-      return headerMatch[1];
+      cachedCsrfToken = headerMatch[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const hiddenInputMatch = html.match(/<input\s+type="hidden"\s+name="_csrf"\s+value="([^"]+)"/i);
     if (hiddenInputMatch) {
-      return hiddenInputMatch[1];
+      cachedCsrfToken = hiddenInputMatch[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     const anyInputCsrf = html.match(/name="_csrf"[^>]*value="([^"]+)"/i) || 
                          html.match(/value="([^"]+)"[^>]*name="_csrf"/i);
     if (anyInputCsrf) {
-      return anyInputCsrf[1];
+      cachedCsrfToken = anyInputCsrf[1];
+      cachedCsrfFetchedAt = Date.now();
+      return cachedCsrfToken;
     }
     
     return null;
   } catch (error) {
     console.error("[CSRF] Error fetching CSRF token:", error);
     return null;
+  } finally {
+    csrfTokenPromise = null;
   }
+  })();
+
+  return csrfTokenPromise;
 };
 
 export const getAttendance = async (semesterId) => {
