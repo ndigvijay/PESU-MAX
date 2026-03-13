@@ -1,6 +1,5 @@
-import { getSubjectsCode, getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile, getSemesterGpa } from "../helpers/pesuAPI.js";
-import { parseSubjectsCode, parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile, parseGpaData } from "../helpers/parser.js";
-import { filterEnggSubjectsCode } from "../helpers/enggSubjects.js";
+import { getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile, getSemesterGpa, getSemesterDetails } from "../helpers/pesuAPI.js";
+import { parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile, parseGpaData, parseSemesterDetails } from "../helpers/parser.js";
 import { save, load } from "../utils/storage.js";
 import { parallelBatch } from "../helpers/MiscControllers.js";
 
@@ -28,18 +27,46 @@ export async function saveUserProfileData() {
 
 export async function fetchAllPESUData() {
   try {
-    const subjectsData = await getSubjectsCode();
-    if (!subjectsData) {
-      console.error("No subjects data received");
+    let semesters = await load("semestersData");
+    if (!semesters?.length) {
+      await fetchSemesters();
+      semesters = await load("semestersData");
+    }
+
+    if (!semesters?.length) {
+      console.error("No semesters data available");
       return;
     }
-    
-    const subjects = parseSubjectsCode(subjectsData);
-    const enggSubjects = await filterEnggSubjectsCode(subjects);
-    console.log(`Found ${enggSubjects.length} engineering subjects`);
 
-    const subjectsWithUnits = await parallelBatch(enggSubjects, async (subject) => {
-      if (!subject.id) return null;
+    const semesterSubjects = await parallelBatch(semesters, async (semester) => {
+      try {
+        const detailsHtml = await getSemesterDetails(semester.value);
+        return parseSemesterDetails(detailsHtml).map((subject) => ({
+          ...subject,
+          semester: semester.number,
+          semesterId: semester.value
+        }));
+      } catch (err) {
+        console.error(`Error fetching semester details for semester ${semester.number}:`, err);
+        return [];
+      }
+    }, 3);
+
+    const subjects = semesterSubjects.flat();
+    const subjectMap = new Map();
+
+    for (const subject of subjects) {
+      if (!subject?.id) {
+        continue;
+      }
+
+      subjectMap.set(subject.id, subject);
+    }
+
+    const enrolledSubjects = Array.from(subjectMap.values());
+    console.log(`Found ${enrolledSubjects.length} enrolled semester subjects`);
+
+    const subjectsWithUnits = await parallelBatch(enrolledSubjects, async (subject) => {
       try {
         const unitsData = await getCourseUnits(subject.id);
         const units = unitsData ? parseCourseUnits(unitsData) : [];
@@ -50,10 +77,8 @@ export async function fetchAllPESUData() {
       }
     }, 5);
 
-    const validSubjects = subjectsWithUnits.filter(s => s !== null);
-
-    const allUnits = validSubjects.flatMap(s => 
-      s.units.filter(u => u.id).map(u => ({ subjectId: s.id, unit: u }))
+    const allUnits = subjectsWithUnits.flatMap(subject =>
+      (subject.units || []).filter((unit) => unit.id).map((unit) => ({ subjectId: subject.id, unit }))
     );
 
     const unitsWithClasses = await parallelBatch(allUnits, async ({ subjectId, unit }) => {
@@ -68,11 +93,13 @@ export async function fetchAllPESUData() {
     }, 5);
 
     const subjectsMap = {};
-    for (const subject of validSubjects) {
+    for (const subject of subjectsWithUnits) {
       subjectsMap[subject.id] = {
         id: subject.id,
         subjectCode: subject.subjectCode,
         subjectName: subject.subjectName,
+        semester: subject.semester ?? null,
+        semesterId: subject.semesterId ?? null,
         units: {}
       };
     }
@@ -81,7 +108,7 @@ export async function fetchAllPESUData() {
       if (subjectsMap[subjectId]) {
         subjectsMap[subjectId].units[unit.id] = {
           id: unit.id,
-          name: unit.name,
+          name: unit.name || unit.unit || unit.unitNumber || "",
           classes: unit.classes
         };
       }
@@ -89,7 +116,7 @@ export async function fetchAllPESUData() {
 
     save("pesuData", {
       subjects: subjectsMap,
-      allSubjects: subjects,
+      allSubjects: enrolledSubjects,
       fetchedAt: Date.now()
     });
     console.log("PESU data fetch complete");
@@ -181,6 +208,15 @@ const fetchLocks = {
   gpaData: false
 };
 
+function needsPesuDataRefresh(pesuData) {
+  const subjects = Object.values(pesuData?.subjects || {});
+  if (subjects.length === 0) {
+    return true;
+  }
+
+  return subjects.some((subject) => subject.semester == null || subject.semesterId == null);
+}
+
 // get auth cookie
 function fetchAndStorePESUSessionId() {
   chrome.cookies.get(
@@ -221,12 +257,13 @@ async function syncMissingData() {
 
   // Only fetch semesters and pesuData AFTER profile exists
   if (userProfile) {
-    if (!semesters && !fetchLocks.semesters) {
+    if (!semesters?.length && !fetchLocks.semesters) {
       fetchLocks.semesters = true;
-      fetchSemesters().finally(() => { fetchLocks.semesters = false; });
+      await fetchSemesters().finally(() => { fetchLocks.semesters = false; });
+      semesters = await load("semestersData");
     }
 
-    if (!pesuData && !fetchLocks.pesuData) {
+    if (needsPesuDataRefresh(pesuData) && !fetchLocks.pesuData) {
       fetchLocks.pesuData = true;
       // Save fetch status to storage so frontend can show indicator
       chrome.storage.local.set({ fetchStatus: { pesuData: true } });
@@ -236,7 +273,7 @@ async function syncMissingData() {
         chrome.storage.local.set({ fetchStatus: { pesuData: false } });
       });
     }
-    if (semesters && !gpaData && !fetchLocks.gpaData) {
+    if (semesters?.length && !gpaData && !fetchLocks.gpaData) {
       fetchLocks.gpaData = true;
       chrome.storage.local.set({ fetchStatus: { gpaData: true } });
       

@@ -28,7 +28,10 @@ function filterBySemester(subjects, semester) {
   }
   
   const semesterNum = parseInt(semester);
-  return subjects.filter(subject => getSemester(subject.subjectCode) === semesterNum);
+  return subjects.filter(subject => {
+    const subjectSemester = subject.semester ?? getSemester(subject.subjectCode);
+    return subjectSemester === semesterNum;
+  });
 }
 
 // Pagination and search helper
@@ -110,7 +113,7 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
       subjectCode: subject.subjectCode,
       subjectName: subject.subjectName,
       unitCount: Object.keys(subject.units || {}).length,
-      semester: getSemester(subject.subjectCode)
+      semester: subject.semester ?? getSemester(subject.subjectCode)
     }));
     
     // Filter by semester
@@ -218,7 +221,7 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
       id: subject.id,
       subjectCode: subject.subjectCode,
       subjectName: subject.subjectName,
-      semester: getSemester(subject.subjectCode),
+      semester: subject.semester ?? getSemester(subject.subjectCode),
       units: Object.values(subject.units || {}).map(unit => ({
         id: unit.id,
         name: unit.name,
@@ -282,7 +285,7 @@ export async function getAllPESUDataNested() {
     id: subject.id,
     subjectCode: subject.subjectCode,
     subjectName: subject.subjectName,
-    semester: getSemester(subject.subjectCode),
+    semester: subject.semester ?? getSemester(subject.subjectCode),
     units: Object.values(subject.units || {}).map(unit => ({
       id: unit.id,
       name: unit.name,
@@ -294,4 +297,3 @@ export async function getAllPESUDataNested() {
     }))
   }));
 }
-

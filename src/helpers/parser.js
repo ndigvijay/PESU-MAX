@@ -54,6 +54,51 @@ export const parseSemesters = (optionsString) => {
   return results;
 };
 
+export const parseSemesterDetails = (htmlData) => {
+  if (!htmlData || (typeof htmlData === 'string' && !htmlData.trim())) {
+    return [];
+  }
+
+  const $ = load(htmlData);
+  const subjects = [];
+
+  $('tr[id^="rowWiseCourseContent_"]').each((index, row) => {
+    const rowId = $(row).attr('id') || '';
+    const subjectId = cleanId(rowId.replace('rowWiseCourseContent_', ''));
+    const cells = $(row).find('td');
+
+    if (!subjectId || cells.length < 2) {
+      return;
+    }
+
+    const codeCell = $(cells[0]).clone();
+    codeCell.find('div').remove();
+
+    const subjectCode = codeCell.text().replace(/\s+/g, ' ').trim();
+    const subjectName = $(cells[1]).text().replace(/\s+/g, ' ').trim();
+    const courseType = $(cells[2]).text().replace(/\s+/g, ' ').trim();
+    const status = $(cells[3]).text().replace(/\s+/g, ' ').trim();
+
+    if (!subjectCode || !subjectName) {
+      return;
+    }
+
+    if (status && status.toLowerCase() !== 'enrolled') {
+      return;
+    }
+
+    subjects.push({
+      id: subjectId,
+      subjectCode,
+      subjectName,
+      courseType,
+      status
+    });
+  });
+
+  return subjects;
+};
+
 
 export const parseCourseUnits = (data) => {
   if (!data || (typeof data === 'string' && !data.trim())) {
@@ -74,6 +119,7 @@ export const parseCourseUnits = (data) => {
       
       units.push({
         id: cleanId(unit_id),
+        name: unit_name,
         unit: unit_name,
         unitNumber: unitNumber
       });
