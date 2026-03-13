@@ -46,6 +46,9 @@ const Home = () => {
             <Typography variant="body1" sx={{ textAlign: 'center', padding: '12px' }}>
               if you have just logged in, please wait a minute for the data to be fetched.
             </Typography>
+            <Typography variant="body1" sx={{ textAlign: 'center', padding: '12px' }}>
+              For a better experience, please login first and load the extension.
+            </Typography>
             </>
           )}
           {isLoggedIn && (<Button 

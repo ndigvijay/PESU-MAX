@@ -99,7 +99,7 @@ module.exports = (env, argv) => {
       new CopyPlugin({
         patterns: [
           {
-            from: 'public/icons/manifest.json',
+            from: 'manifest.json',
             to: 'manifest.json'
           },
           {
