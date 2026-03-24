@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PESU-MAX",
-  "version": "1.0",
+  "version": "1.0.1",
   "action": {
     "default_popup": "src/popup/index.html"
   },
@@ -17,11 +17,13 @@
     }
   ],
   "icons": {
-    "128": "icons/Pes_logo_square.png"
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "web_accessible_resources": [
     {
-      "resources": ["icons/Pes_logo_square.png"],
+      "resources": ["icons/Pes_logo_square_ui.png"],
       "matches": ["https://www.pesuacademy.com/*"]
     }
   ]
