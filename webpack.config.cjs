@@ -103,8 +103,20 @@ module.exports = (env, argv) => {
             to: 'manifest.json'
           },
           {
-            from: 'public/icons/Pes_logo_square.png',
-            to: 'icons/Pes_logo_square.png'
+            from: 'public/icons/Pes_logo_square_ui.png',
+            to: 'icons/Pes_logo_square_ui.png'
+          },
+          {
+            from: 'public/icons/icon16.png',
+            to: 'icons/icon16.png'
+          },
+          {
+            from: 'public/icons/icon48.png',
+            to: 'icons/icon48.png'
+          },
+          {
+            from: 'public/icons/icon128.png',
+            to: 'icons/icon128.png'
           }
         ]
       })

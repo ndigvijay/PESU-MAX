@@ -4,7 +4,7 @@ import IconButton from "@mui/material/IconButton";
 import { toggleSidebar } from "../redux/sidebarSlice.js";
 import theme from "../Themes/theme.jsx";
 
-const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
+const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square_ui.png");
 
 const CircularButton = () => {
   const dispatch = useDispatch();

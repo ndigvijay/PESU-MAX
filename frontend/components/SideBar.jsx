@@ -9,7 +9,7 @@ import CourseMaterial from '../Pages/CourseMaterial.jsx';
 import KnowYourFaculty from '../Pages/KnowYourFaculty.jsx';
 import Attendance from '../Pages/Attendance.jsx';
 import GPACalculator from '../Pages/GPACalculator.jsx';
-const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square.png");
+const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square_ui.png");
 
 
 
