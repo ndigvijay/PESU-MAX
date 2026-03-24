@@ -52,7 +52,7 @@ export const fetchSemesters = () => {
 };
 
 
-export const downloadMaterials = (selectedItems, contentTypes, onProgress) => {
+export const downloadMaterials = (selectedItems, contentTypes, mergeSlides, onProgress) => {
   return new Promise((resolve, reject) => {
     // Set up progress listener
     const progressListener = (port) => {
@@ -73,7 +73,8 @@ export const downloadMaterials = (selectedItems, contentTypes, onProgress) => {
     chrome.runtime.sendMessage({
       action: "downloadSelectedMaterials",
       selectedItems,
-      contentTypes
+      contentTypes,
+      mergeSlides
     }, (response) => {
       chrome.runtime.onConnect.removeListener(progressListener);
       

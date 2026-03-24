@@ -51,9 +51,11 @@ const DownloadProgressDialog = ({ open, onClose }) => {
           <Box sx={{ width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-                {downloadProgress.status === 'zipping' 
-                  ? 'Creating ZIP file...' 
-                  : `Downloading ${downloadProgress.current} of ${downloadProgress.total}`}
+                {downloadProgress.status === 'merging'
+                  ? `Merging slides ${downloadProgress.current} of ${downloadProgress.total}`
+                  : downloadProgress.status === 'zipping'
+                    ? 'Creating ZIP file...'
+                    : `Downloading ${downloadProgress.current} of ${downloadProgress.total}`}
               </Typography>
               <Typography variant="body2" sx={{ color: theme.colors.primary, fontSize: '12px', fontWeight: '500' }}>
                 {downloadProgress.total > 0 
@@ -89,6 +91,13 @@ const DownloadProgressDialog = ({ open, onClose }) => {
             {downloadResult.success ? (
               <Alert severity="success" sx={successAlertSx}>
                 Successfully downloaded {downloadResult.stats?.successful || 0} files!
+                {downloadResult.stats?.mergedSubjects > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>
+                      Created {downloadResult.stats.mergedSubjects} merged slide PDF{downloadResult.stats.mergedSubjects > 1 ? 's' : ''} subject-wise.
+                    </Typography>
+                  </Box>
+                )}
                 {downloadResult.stats?.failed > 0 && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>

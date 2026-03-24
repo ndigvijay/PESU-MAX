@@ -5,6 +5,7 @@ import {
   fetchAllPesuData,
   downloadMaterials as downloadMaterialsApi
 } from "../../src/services/courseMaterialService.js";
+import { CONTENT_TYPE_IDS } from "../constants/constants.js";
 
 
 export const fetchPesuData = createAsyncThunk(
@@ -33,7 +34,7 @@ export const fetchSemesters = createAsyncThunk(
 
 export const downloadSelectedMaterials = createAsyncThunk(
   "courseMaterial/downloadSelectedMaterials",
-  async ({ contentTypes }, { getState, dispatch, rejectWithValue }) => {
+  async ({ contentTypes, mergeSlides = false }, { getState, dispatch, rejectWithValue }) => {
     try {
 
       const allData = await fetchAllPesuData();
@@ -68,17 +69,23 @@ export const downloadSelectedMaterials = createAsyncThunk(
         return rejectWithValue("No items selected");
       }
 
-      const totalOperations = selectedItems.length * contentTypes.length;
+      const shouldMergeSlides = mergeSlides && contentTypes.includes(CONTENT_TYPE_IDS.slides);
+      const mergeSubjectCount = shouldMergeSlides
+        ? new Set(selectedItems.map((item) => item.subjectId)).size
+        : 0;
+      const totalOperations = (selectedItems.length * contentTypes.length) + mergeSubjectCount;
+
       dispatch(setDownloadProgress({ 
         current: 0, 
         total: totalOperations, 
-        currentItem: 'Starting...', 
+        currentItem: shouldMergeSlides ? 'Preparing subject-wise slide merge...' : 'Starting...', 
         status: 'downloading' 
       }));
 
       const result = await downloadMaterialsApi(
         selectedItems, 
         contentTypes,
+        mergeSlides,
         (progress) => dispatch(setDownloadProgress(progress))
       );
 

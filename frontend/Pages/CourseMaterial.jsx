@@ -7,6 +7,7 @@ import CourseMaterialHeader from "../components/CourseMaterial/CourseMaterialHea
 import CourseMaterialFilters from "../components/CourseMaterial/CourseMaterialFilters.jsx";
 import CourseMaterialTable from "../components/CourseMaterial/CourseMaterialTable.jsx";
 import ContentTypeDialog from "../components/CourseMaterial/ContentTypeDialog.jsx";
+import MergeSlidesDialog from "../components/CourseMaterial/MergeSlidesDialog.jsx";
 import DownloadProgressDialog from "../components/CourseMaterial/DownloadProgressDialog.jsx";
 
 // Redux actions
@@ -22,13 +23,16 @@ import {
   getBackgroundFetchStatus, 
   subscribeToStorageChanges 
 } from "../../src/services/courseMaterialService.js";
+import { CONTENT_TYPE_IDS } from "../constants/constants.js";
 
 const CourseMaterial = () => {
   const dispatch = useDispatch();
   
   // Local UI state
   const [contentTypeDialogOpen, setContentTypeDialogOpen] = useState(false);
+  const [mergeSlidesDialogOpen, setMergeSlidesDialogOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
+  const [pendingContentTypes, setPendingContentTypes] = useState([]);
   
   // Redux state
   const { search, semester, page, rowsPerPage, downloading } = useSelector(
@@ -66,13 +70,40 @@ const CourseMaterial = () => {
     setContentTypeDialogOpen(true);
   };
 
+  const startDownload = (contentTypes, mergeSlides = false) => {
+    if (contentTypes.length > 0) {
+      setDownloadDialogOpen(true);
+      dispatch(downloadSelectedMaterials({ contentTypes, mergeSlides }));
+    }
+  };
+
   // Handle content type dialog confirm
   const handleContentTypeConfirm = (contentTypes) => {
     setContentTypeDialogOpen(false);
-    if (contentTypes.length > 0) {
-      setDownloadDialogOpen(true);
-      dispatch(downloadSelectedMaterials({ contentTypes }));
+
+    if (contentTypes.length === 0) {
+      return;
     }
+
+    if (contentTypes.includes(CONTENT_TYPE_IDS.slides)) {
+      setPendingContentTypes(contentTypes);
+      setMergeSlidesDialogOpen(true);
+      return;
+    }
+
+    startDownload(contentTypes, false);
+  };
+
+  const handleMergeSlidesConfirm = (mergeSlides) => {
+    const contentTypes = pendingContentTypes;
+    setMergeSlidesDialogOpen(false);
+    setPendingContentTypes([]);
+    startDownload(contentTypes, mergeSlides);
+  };
+
+  const handleMergeSlidesClose = () => {
+    setMergeSlidesDialogOpen(false);
+    setPendingContentTypes([]);
   };
 
   // Handle download dialog close
@@ -101,6 +132,12 @@ const CourseMaterial = () => {
         open={contentTypeDialogOpen}
         onClose={() => setContentTypeDialogOpen(false)}
         onConfirm={handleContentTypeConfirm}
+      />
+
+      <MergeSlidesDialog
+        open={mergeSlidesDialogOpen}
+        onClose={handleMergeSlidesClose}
+        onConfirm={handleMergeSlidesConfirm}
       />
 
       <DownloadProgressDialog
