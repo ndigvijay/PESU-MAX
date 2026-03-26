@@ -42,6 +42,8 @@ const rowCardSx = {
   marginBottom: "10px"
 };
 
+const loadingText = "fetching resources from library";
+
 const PYQ = () => {
   const dispatch = useDispatch();
   const {
@@ -176,12 +178,23 @@ const PYQ = () => {
         <Box
           sx={{
             display: "flex",
+            flexDirection: "column",
             justifyContent: "center",
             alignItems: "center",
+            gap: "10px",
             flex: 1
           }}
         >
           <CircularProgress sx={{ color: theme.colors.primary }} />
+          <Typography
+            sx={{
+              fontSize: "12px",
+              color: theme.colors.secondary,
+              letterSpacing: "0.2px"
+            }}
+          >
+            {loadingText}
+          </Typography>
         </Box>
       )}
 
@@ -358,8 +371,20 @@ const PYQ = () => {
               )}
 
               {searchLoading && (
-                <Box sx={{ display: "flex", justifyContent: "center", padding: "12px 0" }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "12px 0"
+                  }}
+                >
                   <CircularProgress size={24} sx={{ color: theme.colors.primary }} />
+                  <Typography sx={{ fontSize: "12px", color: theme.colors.secondary }}>
+                    {loadingText}
+                  </Typography>
                 </Box>
               )}
 
