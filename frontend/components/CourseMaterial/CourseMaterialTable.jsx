@@ -27,6 +27,8 @@ const CourseMaterialTable = () => {
     isFetchingInBackground 
   } = useSelector((state) => state.courseMaterial);
 
+  const effectiveRowsPerPage = pesuData?.pagination?.limit || rowsPerPage;
+
   const handleChangePage = (event, newPage) => {
     dispatch(setPage(newPage));
   };
@@ -86,9 +88,9 @@ const CourseMaterialTable = () => {
           count={pesuData.pagination.total}
           page={page}
           onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
+          rowsPerPage={effectiveRowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[effectiveRowsPerPage]}
           sx={paginationSx}
         />
       )}
