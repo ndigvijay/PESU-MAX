@@ -4,6 +4,7 @@ import courseMaterialReducer from './courseMaterialSlice.js';
 import facultyReducer from './facultySlice.js';
 import attendanceReducer from './attendanceSlice.js';
 import gpaReducer from './gpaSlice.js';
+import pyqReducer from './pyqSlice.js';
 
 const store = configureStore({
     reducer : {
@@ -11,7 +12,8 @@ const store = configureStore({
         courseMaterial: courseMaterialReducer,
         faculty: facultyReducer,
         attendance: attendanceReducer,
-        gpa: gpaReducer
+        gpa: gpaReducer,
+        pyq: pyqReducer
     }
 })
 

@@ -247,24 +247,54 @@ export async function getPESUDataPagination({ type, search = "", page = 0, limit
       subject.units && subject.units.length > 0
     );
     
-    // Paginate subjects
-    const total = filtered.length;
-    const totalPages = Math.ceil(total / limit);
-    const start = page * limit;
-    const end = start + limit;
-    const paginated = filtered.slice(start, end);
-    
-    result = {
-      items: paginated,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNext: page < totalPages - 1,
-        hasPrev: page > 0
-      }
-    };
+    if (semester === "all") {
+      const subjectsBySemester = new Map();
+
+      filtered.forEach((subject) => {
+        const key = Number.isFinite(subject.semester) ? subject.semester : "unknown";
+        if (!subjectsBySemester.has(key)) {
+          subjectsBySemester.set(key, []);
+        }
+        subjectsBySemester.get(key).push(subject);
+      });
+
+      const semesterKeys = Array.from(subjectsBySemester.keys()).sort((a, b) => {
+        if (a === "unknown" && b === "unknown") return 0;
+        if (a === "unknown") return 1;
+        if (b === "unknown") return -1;
+        return a - b;
+      });
+
+      const total = semesterKeys.length;
+      const totalPages = total;
+      const normalizedPage = total === 0 ? 0 : Math.min(Math.max(page, 0), total - 1);
+      const activeSemesterKey = semesterKeys[normalizedPage];
+      const paginated = activeSemesterKey === undefined ? [] : (subjectsBySemester.get(activeSemesterKey) || []);
+
+      result = {
+        items: paginated,
+        pagination: {
+          page: normalizedPage,
+          limit: Math.max(paginated.length, 1),
+          total,
+          totalPages,
+          hasNext: normalizedPage < totalPages - 1,
+          hasPrev: normalizedPage > 0
+        }
+      };
+    } else {
+      result = {
+        items: filtered,
+        pagination: {
+          page: 0,
+          limit: Math.max(filtered.length, 1),
+          total: filtered.length,
+          totalPages: filtered.length > 0 ? 1 : 0,
+          hasNext: false,
+          hasPrev: false
+        }
+      };
+    }
   }
   else {
     throw new Error("Invalid type. Use 'subjects', 'units', 'classes', or 'nested'");

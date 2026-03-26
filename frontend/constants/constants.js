@@ -33,3 +33,6 @@ export const DEFAULT_CONTENT_TYPE_SELECTION = {
   qa: false,
   qb: false
 };
+
+export const LIBRARY_MEMBER_ID_BASE64 = "MTIwNTg=";
+export const LIBRARY_PASSWORD_BASE64 = "cGVzc2VsaWJyYXJ5";

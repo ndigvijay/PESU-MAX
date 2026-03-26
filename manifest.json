@@ -9,7 +9,13 @@
     "service_worker": "background/background.js"
   },
   "permissions": ["cookies", "storage", "downloads", "alarms"],
-  "host_permissions": ["https://www.pesuacademy.com/*","https://files.pesuacademy.com/*","https://staff.pes.edu/*"],
+  "host_permissions": [
+    "https://www.pesuacademy.com/*",
+    "https://files.pesuacademy.com/*",
+    "https://staff.pes.edu/*",
+    "http://library.pes.edu/*",
+    "https://library.pes.edu/*"
+  ],
   "content_scripts": [
     {
       "matches": ["https://www.pesuacademy.com/*"],
