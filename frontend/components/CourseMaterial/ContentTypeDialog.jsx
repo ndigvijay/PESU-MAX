@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -14,8 +14,14 @@ import theme from "../../Themes/theme.jsx";
 import { CONTENT_TYPE_OPTIONS, DEFAULT_CONTENT_TYPE_SELECTION } from "../../constants/constants.js";
 import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx } from "../../styles/styles.js";
 
-const ContentTypeDialog = ({ open, onClose, onConfirm }) => {
-  const [selectedContentTypes, setSelectedContentTypes] = useState(DEFAULT_CONTENT_TYPE_SELECTION);
+const ContentTypeDialog = ({ open, onClose, onConfirm, initialSelection = DEFAULT_CONTENT_TYPE_SELECTION }) => {
+  const [selectedContentTypes, setSelectedContentTypes] = useState(initialSelection);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedContentTypes(initialSelection || DEFAULT_CONTENT_TYPE_SELECTION);
+    }
+  }, [open, initialSelection]);
 
   const handleContentTypeChange = (key) => {
     setSelectedContentTypes(prev => ({
@@ -30,7 +36,7 @@ const ContentTypeDialog = ({ open, onClose, onConfirm }) => {
     const contentTypes = CONTENT_TYPE_OPTIONS
       .filter(opt => selectedContentTypes[opt.key])
       .map(opt => opt.id);
-    onConfirm(contentTypes);
+    onConfirm(contentTypes, selectedContentTypes);
   };
 
   const handleClose = () => {

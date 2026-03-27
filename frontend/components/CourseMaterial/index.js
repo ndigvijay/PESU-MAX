@@ -6,4 +6,5 @@ export { default as SubjectRow } from './SubjectRow.jsx';
 export { default as UnitRow } from './UnitRow.jsx';
 export { default as ClassRow } from './ClassRow.jsx';
 export { default as ContentTypeDialog } from './ContentTypeDialog.jsx';
+export { default as MergeSlidesDialog } from './MergeSlidesDialog.jsx';
 export { default as DownloadProgressDialog } from './DownloadProgressDialog.jsx';

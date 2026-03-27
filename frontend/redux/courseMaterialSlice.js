@@ -1,10 +1,11 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { 
-  fetchPesuData as fetchPesuDataApi, 
+import {
+  fetchPesuData as fetchPesuDataApi,
   fetchSemesters as fetchSemestersApi,
   fetchAllPesuData,
   downloadMaterials as downloadMaterialsApi
 } from "../../src/services/courseMaterialService.js";
+import { DEFAULT_MERGE_SELECTION, MERGEABLE_CONTENT_TYPE_OPTIONS } from "../constants/constants.js";
 
 
 export const fetchPesuData = createAsyncThunk(
@@ -33,7 +34,7 @@ export const fetchSemesters = createAsyncThunk(
 
 export const downloadSelectedMaterials = createAsyncThunk(
   "courseMaterial/downloadSelectedMaterials",
-  async ({ contentTypes }, { getState, dispatch, rejectWithValue }) => {
+  async ({ contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION }, { getState, dispatch, rejectWithValue }) => {
     try {
 
       const allData = await fetchAllPesuData();
@@ -68,17 +69,29 @@ export const downloadSelectedMaterials = createAsyncThunk(
         return rejectWithValue("No items selected");
       }
 
-      const totalOperations = selectedItems.length * contentTypes.length;
-      dispatch(setDownloadProgress({ 
-        current: 0, 
-        total: totalOperations, 
-        currentItem: 'Starting...', 
-        status: 'downloading' 
+      const normalizedMergeOptions = {
+        ...DEFAULT_MERGE_SELECTION,
+        ...(mergeOptions || {})
+      };
+      const enabledMergeTypes = MERGEABLE_CONTENT_TYPE_OPTIONS.filter((option) =>
+        contentTypes.includes(option.id) && normalizedMergeOptions[option.key]
+      );
+      const mergeSubjectCount = enabledMergeTypes.length > 0
+        ? new Set(selectedItems.map((item) => item.subjectId)).size * enabledMergeTypes.length
+        : 0;
+      const totalOperations = (selectedItems.length * contentTypes.length) + mergeSubjectCount;
+
+      dispatch(setDownloadProgress({
+        current: 0,
+        total: totalOperations,
+        currentItem: enabledMergeTypes.length > 0 ? 'Preparing subject-wise merges...' : 'Starting...',
+        status: 'downloading'
       }));
 
       const result = await downloadMaterialsApi(
-        selectedItems, 
+        selectedItems,
         contentTypes,
+        normalizedMergeOptions,
         (progress) => dispatch(setDownloadProgress(progress))
       );
 

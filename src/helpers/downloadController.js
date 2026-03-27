@@ -3,7 +3,7 @@ import { CONTENT_TYPE_IDS } from './pesuAPI.js';
 
 const DEFAULT_CONTENT_TYPES = [CONTENT_TYPE_IDS.slides];
 
-export async function handleBulkDownload(selectedItems, contentTypes, sender, sendResponse) {
+export async function handleBulkDownload(selectedItems, contentTypes, mergeOptions = {}, mergeSlides = false, sender, sendResponse) {
   if (!selectedItems || selectedItems.length === 0) {
     sendResponse({ error: "No items selected" });
     return;
@@ -34,7 +34,10 @@ export async function handleBulkDownload(selectedItems, contentTypes, sender, se
   };
 
   try {
-    const result = await createBulkDownloadZip(selectedItems, progressCallback, typesToDownload);
+    const result = await createBulkDownloadZip(selectedItems, progressCallback, typesToDownload, {
+      mergeOptions,
+      mergeSlides
+    });
     
     // Convert blob to data URL 
     const arrayBuffer = await result.blob.arrayBuffer();
@@ -80,4 +83,3 @@ export async function handleBulkDownload(selectedItems, contentTypes, sender, se
     }
   }
 }
-

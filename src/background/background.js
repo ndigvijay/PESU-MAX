@@ -55,7 +55,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "downloadSelectedMaterials") {
     // 2=slides, 3=notes, 5=assignments, 6=qb, 7=qa
     // If not provided, defaults to slides only [2]
-    handleBulkDownload(request.selectedItems, request.contentTypes, sender, sendResponse);
+    handleBulkDownload(
+      request.selectedItems,
+      request.contentTypes,
+      request.mergeOptions,
+      request.mergeSlides,
+      sender,
+      sendResponse
+    );
     return true;
   }
 

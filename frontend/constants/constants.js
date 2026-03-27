@@ -25,6 +25,12 @@ export const CONTENT_TYPE_OPTIONS = [
   { key: 'qa', label: 'Questions & Answers (QA)', id: CONTENT_TYPE_IDS.qa }
 ];
 
+export const MERGEABLE_CONTENT_TYPE_KEYS = ['slides', 'notes', 'assignments'];
+
+export const MERGEABLE_CONTENT_TYPE_OPTIONS = CONTENT_TYPE_OPTIONS.filter((option) =>
+  MERGEABLE_CONTENT_TYPE_KEYS.includes(option.key)
+);
+
 // Default content type selection state
 export const DEFAULT_CONTENT_TYPE_SELECTION = {
   slides: true,
@@ -32,6 +38,12 @@ export const DEFAULT_CONTENT_TYPE_SELECTION = {
   assignments: false,
   qa: false,
   qb: false
+};
+
+export const DEFAULT_MERGE_SELECTION = {
+  slides: false,
+  notes: false,
+  assignments: false
 };
 
 export const LIBRARY_MEMBER_ID_BASE64 = "MTIwNTg=";
