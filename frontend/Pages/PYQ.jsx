@@ -15,6 +15,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SearchIcon from "@mui/icons-material/Search";
 import DownloadIcon from "@mui/icons-material/Download";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 import { useDispatch, useSelector } from "react-redux";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
 import {
@@ -43,6 +44,7 @@ const rowCardSx = {
 };
 
 const loadingText = "fetching resources from library";
+const authLoadingText = "fetching resources from library\nplease wait a few seconds";
 
 const PYQ = () => {
   const dispatch = useDispatch();
@@ -190,10 +192,12 @@ const PYQ = () => {
             sx={{
               fontSize: "12px",
               color: theme.colors.secondary,
-              letterSpacing: "0.2px"
+              letterSpacing: "0.2px",
+              textAlign: "center",
+              whiteSpace: "pre-line"
             }}
           >
-            {loadingText}
+            {authLoading ? authLoadingText : loadingText}
           </Typography>
         </Box>
       )}
@@ -423,11 +427,48 @@ const PYQ = () => {
                         </Typography>
                       </Box>
 
-                      <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Button
+                          component="a"
+                          href={item.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="contained"
+                          size="small"
+                          aria-label="View PYQ"
+                          disabled={!item.downloadUrl}
+                          disableRipple
+                          disableElevation
+                          sx={{
+                            backgroundColor: theme.colors.secondary,
+                            color: "#fff",
+                            minWidth: "40px",
+                            width: "40px",
+                            boxShadow: "none",
+                            transition: "none",
+                            "& .MuiSvgIcon-root": {
+                              color: "#fff"
+                            },
+                            "&:hover": {
+                              backgroundColor: theme.colors.secondary,
+                              boxShadow: "none",
+                              transform: "none",
+                              color: "#fff"
+                            },
+                            "&:focus, &:focus-visible": {
+                              backgroundColor: theme.colors.secondary,
+                              boxShadow: "none",
+                              color: "#fff"
+                            }
+                          }}
+                        >
+                          <VisibilityIcon fontSize="small" sx={{ color: "#fff" }} />
+                        </Button>
+
                         <Button
                           variant="contained"
                           size="small"
-                          startIcon={<DownloadIcon fontSize="small" />}
+                          aria-label={downloadingItemId === item.id ? "Downloading PYQ" : "Download PYQ"}
                           onClick={() => handleDownload(item)}
                           disabled={
                             !item.downloadPath ||
@@ -436,14 +477,18 @@ const PYQ = () => {
                           }
                           sx={{
                             backgroundColor: theme.colors.secondary,
-                            textTransform: "none",
-                            minWidth: "98px",
+                            minWidth: "40px",
+                            width: "40px",
                             "&:hover": {
                               backgroundColor: theme.colors.secondaryHover
                             }
                           }}
                         >
-                          {downloadingItemId === item.id ? "Downloading" : "Download"}
+                          {downloadingItemId === item.id ? (
+                            <CircularProgress size={16} sx={{ color: "#fff" }} />
+                          ) : (
+                            <DownloadIcon fontSize="small" />
+                          )}
                         </Button>
                       </Box>
                     </Box>
