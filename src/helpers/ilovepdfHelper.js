@@ -47,6 +47,7 @@ export async function convertOfficeBlobToPdfWithILovePdf({ blob, filename, exten
   const resolvedFilename = resolveFilename(filename, normalizedExtension);
   const taskConfig = await fetchTaskConfig(config.toolPath);
   const workerServer = getWorkerServer(taskConfig);
+  const outputBaseName = buildOutputBaseName(resolvedFilename, "_converted");
 
   const uploadResult = await uploadBlob({
     workerServer,
@@ -66,7 +67,7 @@ export async function convertOfficeBlobToPdfWithILovePdf({ blob, filename, exten
         server_filename: uploadResult.server_filename
       }
     ],
-    outputBaseName: buildOutputBaseName(resolvedFilename, "_converted"),
+    outputBaseName,
     tool: config.tool,
     subtool: config.subtool,
     packagedFilename: config.packagedFilename
@@ -81,11 +82,12 @@ async function fetchTaskConfig(toolPath) {
     method: "GET"
   });
 
+  const html = await response.text();
+
   if (!response.ok) {
     throw new Error(`Failed to fetch iLovePDF task config: ${response.status}`);
   }
 
-  const html = await response.text();
   const configMatch = html.match(/(?:var\s+|window\.)ilovepdfConfig\s*=\s*({[\s\S]*?});/);
   const taskIdMatch = html.match(/ilovepdfConfig\.taskId\s*=\s*['"]([^'"]+)['"]/);
 
@@ -160,7 +162,7 @@ async function uploadBlob({ workerServer, token, taskId, blob, filename }) {
   const payload = await parseResponse(response);
 
   if (!response.ok) {
-    throw new Error(payload?.error || payload?.message || `Failed to upload file ${filename}`);
+    throw new Error(buildApiErrorMessage(payload, `Failed to upload file ${filename}`));
   }
 
   if (!payload?.server_filename) {
@@ -199,7 +201,7 @@ async function processFiles({ workerServer, token, taskId, uploadedFiles, output
 
   const payload = await parseResponse(response);
   if (!response.ok || payload?.status !== "TaskSuccess") {
-    throw new Error(payload?.error || payload?.message || "iLovePDF processing failed");
+    throw new Error(buildApiErrorMessage(payload, "iLovePDF processing failed"));
   }
 
   return payload;
@@ -273,4 +275,43 @@ function resolveFilename(filename, extension) {
 function buildOutputBaseName(filename, suffix) {
   const baseName = (filename || "file").replace(/\.[^.]+$/, "");
   return `${baseName}${suffix}`;
+}
+
+function buildApiErrorMessage(payload, fallbackMessage) {
+  const extractedMessage = extractPayloadMessage(payload);
+  return extractedMessage ? `${fallbackMessage}: ${extractedMessage}` : fallbackMessage;
+}
+
+function extractPayloadMessage(value) {
+  if (!value) {
+    return '';
+  }
+
+  if (typeof value === 'string') {
+    return truncateString(value, 400);
+  }
+
+  if (typeof value?.message === 'string' && value.message.trim()) {
+    return truncateString(value.message, 400);
+  }
+
+  if (typeof value?.error === 'string' && value.error.trim()) {
+    return truncateString(value.error, 400);
+  }
+
+  try {
+    return truncateString(JSON.stringify(value), 400);
+  } catch {
+    return '';
+  }
+}
+
+function truncateString(value, maxLength = 1500) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}...[truncated]`
+    : value;
 }
