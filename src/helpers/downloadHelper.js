@@ -39,6 +39,18 @@ const ALREADY_COMPRESSED_EXTENSIONS = new Set([
   '.mp3'
 ]);
 
+const MERGEABLE_CONTENT_TYPES = [
+  { id: CONTENT_TYPE_IDS.slides, key: 'slides', name: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides] },
+  { id: CONTENT_TYPE_IDS.notes, key: 'notes', name: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.notes] },
+  { id: CONTENT_TYPE_IDS.assignments, key: 'assignments', name: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.assignments] }
+];
+
+const DEFAULT_MERGE_OPTIONS = {
+  slides: false,
+  notes: false,
+  assignments: false
+};
+
 function isAlreadyCompressedExt(extension) {
   if (!extension) return false;
   return ALREADY_COMPRESSED_EXTENSIONS.has(extension.toLowerCase());
@@ -86,8 +98,9 @@ async function isPdfBlob(blob) {
   }
 }
 
-function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, totalFilesInClass) {
+function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, totalFilesInClass, options = {}) {
   const { subjectName, unitNumber, className, classIndex } = item;
+  const { flattenIntoContentFolder = false } = options;
   const safeFolderName = sanitizeFilename(subjectName);
   const contentFolder = sanitizeFilename(contentTypeName);
   const numberingPrefix = `${unitNumber}.${classIndex || 1}.${fileNumber}`;
@@ -103,7 +116,7 @@ function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, 
 
   const safeFileName = baseFileName + fileResult.extension;
 
-  if (contentFolder === 'QA' || contentFolder === 'QB') {
+  if (contentFolder === 'QA' || contentFolder === 'QB' || flattenIntoContentFolder) {
     return `${safeFolderName}/${contentFolder}/${safeFileName}`;
   }
 
@@ -111,13 +124,34 @@ function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, 
   return `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
 }
 
-function buildMergedSlidesFilePath(subjectName, subjectCode) {
-  const safeFolderName = sanitizeFilename(subjectName);
-  const mergedFileName = subjectCode
-    ? `${sanitizeFilename(subjectCode)}_Merged_Slides.pdf`
-    : 'Merged_Slides.pdf';
+function normalizeMergeOptions(mergeOptions = {}, mergeSlides = false) {
+  return {
+    ...DEFAULT_MERGE_OPTIONS,
+    ...(mergeOptions || {}),
+    slides: Boolean(mergeSlides || mergeOptions?.slides)
+  };
+}
 
-  return `${safeFolderName}/Slides/${mergedFileName}`;
+function getEnabledMergeContentTypes(contentTypes, mergeOptions = {}, mergeSlides = false) {
+  const normalizedMergeOptions = normalizeMergeOptions(mergeOptions, mergeSlides);
+
+  return MERGEABLE_CONTENT_TYPES.filter((contentType) =>
+    contentTypes.includes(contentType.id) && normalizedMergeOptions[contentType.key]
+  );
+}
+
+function buildSubjectMergeGroupKey(subjectId, contentType) {
+  return `${subjectId}:${contentType}`;
+}
+
+function buildMergedContentFilePath(subjectName, subjectCode, contentTypeName) {
+  const safeFolderName = sanitizeFilename(subjectName);
+  const safeContentFolder = sanitizeFilename(contentTypeName);
+  const mergedFileName = subjectCode
+    ? `${sanitizeFilename(subjectCode)}_Merged_${safeContentFolder}.pdf`
+    : `Merged_${safeContentFolder}.pdf`;
+
+  return `${safeFolderName}/${safeContentFolder}/${mergedFileName}`;
 }
 
 function getFilenameFromPath(filePath) {
@@ -135,7 +169,7 @@ async function addFileToZip(zip, filePath, blob, extension) {
   zip.file(filePath, arrayBuffer, fileOptions);
 }
 
-async function mergeSubjectSlidePdfs(files) {
+async function mergeSubjectContentPdfs(files) {
   const mergedPdf = await PDFDocument.create();
   const mergeFailures = [];
   let mergedSourceFiles = 0;
@@ -249,26 +283,33 @@ async function getClassMaterialFile(subjectId, classId, contentType = 2) {
 }
 
 export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2], options = {}) {
-  const { mergeSlides = false } = options;
+  const { mergeOptions = {}, mergeSlides = false } = options;
   const zip = new JSZip();
-  const shouldMergeSlides = mergeSlides && contentTypes.includes(CONTENT_TYPE_IDS.slides);
-  const subjectSlideGroups = new Map();
+  const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, mergeOptions, mergeSlides);
+  const enabledMergeContentTypeIds = new Set(enabledMergeContentTypes.map((contentType) => contentType.id));
+  const subjectMergeGroups = new Map();
 
-  if (shouldMergeSlides) {
+  if (enabledMergeContentTypes.length > 0) {
     for (const item of selectedItems) {
-      if (!subjectSlideGroups.has(item.subjectId)) {
-        subjectSlideGroups.set(item.subjectId, {
-          subjectId: item.subjectId,
-          subjectCode: item.subjectCode,
-          subjectName: item.subjectName,
-          files: []
-        });
+      for (const mergeContentType of enabledMergeContentTypes) {
+        const groupKey = buildSubjectMergeGroupKey(item.subjectId, mergeContentType.id);
+
+        if (!subjectMergeGroups.has(groupKey)) {
+          subjectMergeGroups.set(groupKey, {
+            subjectId: item.subjectId,
+            subjectCode: item.subjectCode,
+            subjectName: item.subjectName,
+            contentType: mergeContentType.id,
+            contentTypeName: mergeContentType.name,
+            files: []
+          });
+        }
       }
     }
   }
 
   const downloadOperations = selectedItems.length * contentTypes.length;
-  const totalOperations = downloadOperations + subjectSlideGroups.size;
+  const totalOperations = downloadOperations + subjectMergeGroups.size;
   let completed = 0;
 
   // Create download tasks for each item and content type combination
@@ -315,6 +356,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
   let totalFiles = 0;
   let mergedSubjects = 0;
   let mergedSlideSources = 0;
+  const mergedSubjectsByType = {};
+  const mergedSourceFilesByType = {};
 
   for (const { item, contentType, filesArray } of results) {
     const { subjectName, subjectCode, subjectId, unitNumber, className, classId, classIndex } = item;
@@ -355,16 +398,26 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
       if (fileResult.success && fileResult.blob) {
         const fileNumber = i + 1;
-        const filePath = buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, filesArray.length);
+        const isMergeSelectedType = enabledMergeContentTypeIds.has(contentType);
+        const filePath = buildIndividualFilePath(
+          item,
+          contentTypeName,
+          fileResult,
+          fileNumber,
+          filesArray.length,
+          { flattenIntoContentFolder: isMergeSelectedType }
+        );
         const normalizedExtension = String(fileResult.extension || '').toLowerCase();
-        const canMergeThisFile = shouldMergeSlides && contentType === CONTENT_TYPE_IDS.slides;
+        const canMergeThisFile = isMergeSelectedType;
         const isMergeablePdf = canMergeThisFile && await isPdfBlob(fileResult.blob);
         const isMergeableOffice = canMergeThisFile
           && !isMergeablePdf
           && isOfficeConvertibleExtension(normalizedExtension);
 
         if (isMergeablePdf || isMergeableOffice) {
-          subjectSlideGroups.get(subjectId)?.files.push({
+          const mergeGroupKey = buildSubjectMergeGroupKey(subjectId, contentType);
+
+          subjectMergeGroups.get(mergeGroupKey)?.files.push({
             item,
             blob: fileResult.blob,
             extension: normalizedExtension,
@@ -410,18 +463,19 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     }
   }
 
-  if (shouldMergeSlides) {
+  if (subjectMergeGroups.size > 0) {
     let mergedProgress = 0;
 
-    for (const subjectGroup of subjectSlideGroups.values()) {
+    for (const subjectGroup of subjectMergeGroups.values()) {
       mergedProgress++;
 
       if (progressCallback) {
         progressCallback({
           current: downloadOperations + mergedProgress,
           total: totalOperations,
-          currentItem: `Merging slides for ${subjectGroup.subjectName}`,
-          status: 'merging'
+          currentItem: `Merging ${subjectGroup.contentTypeName} for ${subjectGroup.subjectName}`,
+          status: 'merging',
+          mergeContentType: subjectGroup.contentTypeName
         });
       }
 
@@ -467,7 +521,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
               unitNumber: sourceFile.item.unitNumber,
               className: sourceFile.item.className,
               classId: sourceFile.item.classId,
-              contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
+              contentType: subjectGroup.contentTypeName,
               error: `Failed to convert ${sourceFile.fileName} to PDF: ${conversionError.message || 'Unknown error'}`
             });
 
@@ -483,8 +537,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
                 unitNumber: sourceFile.item.unitNumber,
                 className: sourceFile.item.className,
                 classId: sourceFile.item.classId,
-                contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
-                error: zipError.message || 'Failed to add original non-PDF slide to ZIP after conversion failure'
+                contentType: subjectGroup.contentTypeName,
+                error: zipError.message || 'Failed to add original file to ZIP after conversion failure'
               });
             }
           }
@@ -494,7 +548,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           continue;
         }
 
-        const mergeResult = await mergeSubjectSlidePdfs(filesToMerge);
+        const mergeResult = await mergeSubjectContentPdfs(filesToMerge);
 
         for (const mergeFailure of mergeResult.mergeFailures) {
           failed++;
@@ -505,7 +559,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
             unitNumber: mergeFailure.item.unitNumber,
             className: mergeFailure.item.className,
             classId: mergeFailure.item.classId,
-            contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
+            contentType: subjectGroup.contentTypeName,
             error: mergeFailure.error
           });
         }
@@ -514,19 +568,28 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           continue;
         }
 
-        const mergedFilePath = buildMergedSlidesFilePath(subjectGroup.subjectName, subjectGroup.subjectCode);
+        const mergedFilePath = buildMergedContentFilePath(
+          subjectGroup.subjectName,
+          subjectGroup.subjectCode,
+          subjectGroup.contentTypeName
+        );
         await addFileToZip(zip, mergedFilePath, mergeResult.blob, '.pdf');
         totalFiles++;
-        mergedSubjects++;
-        mergedSlideSources += mergeResult.mergedSourceFiles;
+        mergedSubjectsByType[subjectGroup.contentTypeName] = (mergedSubjectsByType[subjectGroup.contentTypeName] || 0) + 1;
+        mergedSourceFilesByType[subjectGroup.contentTypeName] = (mergedSourceFilesByType[subjectGroup.contentTypeName] || 0) + mergeResult.mergedSourceFiles;
+
+        if (subjectGroup.contentType === CONTENT_TYPE_IDS.slides) {
+          mergedSubjects++;
+          mergedSlideSources += mergeResult.mergedSourceFiles;
+        }
       } catch (error) {
         failed++;
         failedItems.push({
           subjectName: subjectGroup.subjectName,
           subjectCode: subjectGroup.subjectCode,
           subjectId: subjectGroup.subjectId,
-          contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
-          error: error.message || 'Failed to merge subject slides'
+          contentType: subjectGroup.contentTypeName,
+          error: error.message || `Failed to merge subject ${String(subjectGroup.contentTypeName || '').toLowerCase()}`
         });
       }
     }
@@ -541,12 +604,15 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     });
   }
   
-  const zipBlob = await zip.generateAsync({ 
+  const zipBlob = await zip.generateAsync({
     type: 'blob',
     compression: 'DEFLATE',
     compressionOptions: { level: 4 }
   });
-  
+
+  const totalMergedFiles = Object.values(mergedSubjectsByType)
+    .reduce((count, mergedCount) => count + mergedCount, 0);
+
   return {
     blob: zipBlob,
     stats: {
@@ -556,6 +622,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       failedItems,
       mergedSubjects,
       mergedSlideSources,
+      mergedSubjectsByType,
+      mergedSourceFilesByType,
+      totalMergedFiles,
       contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)
     }
   };

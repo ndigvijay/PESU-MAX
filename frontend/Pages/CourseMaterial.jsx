@@ -19,18 +19,22 @@ import {
 } from "../redux/courseMaterialSlice.js";
 
 // Services
-import { 
-  getBackgroundFetchStatus, 
-  subscribeToStorageChanges 
+import {
+  getBackgroundFetchStatus,
+  subscribeToStorageChanges
 } from "../../src/services/courseMaterialService.js";
-import { CONTENT_TYPE_IDS, DEFAULT_CONTENT_TYPE_SELECTION } from "../constants/constants.js";
+import {
+  DEFAULT_CONTENT_TYPE_SELECTION,
+  DEFAULT_MERGE_SELECTION,
+  MERGEABLE_CONTENT_TYPE_OPTIONS
+} from "../constants/constants.js";
 
 const CourseMaterial = () => {
   const dispatch = useDispatch();
   
   // Local UI state
   const [contentTypeDialogOpen, setContentTypeDialogOpen] = useState(false);
-  const [mergeSlidesDialogOpen, setMergeSlidesDialogOpen] = useState(false);
+  const [mergeOptionsDialogOpen, setMergeOptionsDialogOpen] = useState(false);
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [pendingContentTypes, setPendingContentTypes] = useState([]);
   const [contentTypeSelectionState, setContentTypeSelectionState] = useState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
@@ -73,12 +77,15 @@ const CourseMaterial = () => {
     setContentTypeDialogOpen(true);
   };
 
-  const startDownload = (contentTypes, mergeSlides = false) => {
+  const startDownload = (contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION) => {
     if (contentTypes.length > 0) {
       setDownloadDialogOpen(true);
-      dispatch(downloadSelectedMaterials({ contentTypes, mergeSlides }));
+      dispatch(downloadSelectedMaterials({ contentTypes, mergeOptions }));
     }
   };
+
+  const hasMergeableSelection = (contentTypes) =>
+    MERGEABLE_CONTENT_TYPE_OPTIONS.some((option) => contentTypes.includes(option.id));
 
   // Handle content type dialog confirm
   const handleContentTypeConfirm = (contentTypes, selectionState) => {
@@ -90,31 +97,31 @@ const CourseMaterial = () => {
       return;
     }
 
-    if (contentTypes.includes(CONTENT_TYPE_IDS.slides)) {
+    if (hasMergeableSelection(contentTypes)) {
       setPendingContentTypes(contentTypes);
-      setMergeSlidesDialogOpen(true);
+      setMergeOptionsDialogOpen(true);
       return;
     }
 
     setPendingContentTypes([]);
-    startDownload(contentTypes, false);
+    startDownload(contentTypes, DEFAULT_MERGE_SELECTION);
   };
 
-  const handleMergeSlidesConfirm = (mergeSlides) => {
+  const handleMergeSlidesConfirm = (mergeOptions) => {
     const contentTypes = pendingContentTypes;
-    setMergeSlidesDialogOpen(false);
+    setMergeOptionsDialogOpen(false);
     setPendingContentTypes([]);
     setContentTypeSelectionState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
-    startDownload(contentTypes, mergeSlides);
+    startDownload(contentTypes, mergeOptions);
   };
 
   const handleMergeSlidesBack = () => {
-    setMergeSlidesDialogOpen(false);
+    setMergeOptionsDialogOpen(false);
     setContentTypeDialogOpen(true);
   };
 
   const handleMergeSlidesClose = () => {
-    setMergeSlidesDialogOpen(false);
+    setMergeOptionsDialogOpen(false);
     setPendingContentTypes([]);
     setContentTypeSelectionState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
   };
@@ -149,10 +156,11 @@ const CourseMaterial = () => {
       />
 
       <MergeSlidesDialog
-        open={mergeSlidesDialogOpen}
+        open={mergeOptionsDialogOpen}
         onClose={handleMergeSlidesClose}
         onBack={handleMergeSlidesBack}
         onConfirm={handleMergeSlidesConfirm}
+        selectedContentTypes={pendingContentTypes}
       />
 
       <DownloadProgressDialog

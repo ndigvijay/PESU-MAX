@@ -27,6 +27,8 @@ const DownloadProgressDialog = ({ open, onClose }) => {
   const { downloading, downloadProgress, downloadResult } = useSelector(
     (state) => state.courseMaterial
   );
+  const mergedEntries = Object.entries(downloadResult?.stats?.mergedSubjectsByType || {})
+    .filter(([, count]) => count > 0);
 
   const handleClose = () => {
     if (!downloading) {
@@ -52,7 +54,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
                 {downloadProgress.status === 'merging'
-                  ? `Merging slides ${downloadProgress.current} of ${downloadProgress.total}`
+                  ? `Merging ${downloadProgress.mergeContentType ? downloadProgress.mergeContentType.toLowerCase() : 'files'} ${downloadProgress.current} of ${downloadProgress.total}`
                   : downloadProgress.status === 'zipping'
                     ? 'Creating ZIP file...'
                     : `Downloading ${downloadProgress.current} of ${downloadProgress.total}`}
@@ -91,11 +93,20 @@ const DownloadProgressDialog = ({ open, onClose }) => {
             {downloadResult.success ? (
               <Alert severity="success" sx={successAlertSx}>
                 Successfully downloaded {downloadResult.stats?.successful || 0} files!
-                {downloadResult.stats?.mergedSubjects > 0 && (
+                {mergedEntries.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>
-                      Created {downloadResult.stats.mergedSubjects} merged slide PDF{downloadResult.stats.mergedSubjects > 1 ? 's' : ''} subject-wise.
+                      Created {downloadResult.stats?.totalMergedFiles || 0} subject-wise merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
                     </Typography>
+                    <Box component="ul" sx={{ mt: 0.5, pl: 2, mb: 0, color: '#ffffff', fontSize: '11px' }}>
+                      {mergedEntries.map(([contentType, count]) => (
+                        <Box component="li" key={contentType} sx={{ mb: 0.25 }}>
+                          <Typography variant="body2" sx={{ fontSize: '11px', color: '#ffffff' }}>
+                            {contentType}: {count} merged file{count > 1 ? 's' : ''}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
                   </Box>
                 )}
                 {downloadResult.stats?.failed > 0 && (
