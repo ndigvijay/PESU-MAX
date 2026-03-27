@@ -56,6 +56,15 @@ function isAlreadyCompressedExt(extension) {
   return ALREADY_COMPRESSED_EXTENSIONS.has(extension.toLowerCase());
 }
 
+function normalizeExtension(extension) {
+  if (typeof extension !== 'string' || !extension.trim()) {
+    return '';
+  }
+
+  const trimmed = extension.trim().toLowerCase();
+  return trimmed.startsWith('.') ? trimmed : `.${trimmed}`;
+}
+
 // Detect file extension from response headers
 function getFileExtension(response, fallback = '.pdf') {
   const contentDisposition = response.headers.get('Content-Disposition') || '';
@@ -87,20 +96,106 @@ function sanitizeFilename(name) {
     .substring(0, 100);
 }
 
-async function isPdfBlob(blob) {
-  if (!blob) return false;
+function isZipHeader(header) {
+  return header.length >= 4
+    && header[0] === 0x50
+    && header[1] === 0x4b
+    && header[2] === 0x03
+    && header[3] === 0x04;
+}
+
+function hasPdfSignature(header) {
+  if (!header || header.length < 4) {
+    return false;
+  }
+
+  for (let index = 0; index <= header.length - 4; index++) {
+    if (
+      header[index] === 0x25
+      && header[index + 1] === 0x50
+      && header[index + 2] === 0x44
+      && header[index + 3] === 0x46
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function inspectBlobFileType(blob, reportedExtension = '') {
+  const normalizedReportedExtension = normalizeExtension(reportedExtension);
+
+  if (!blob) {
+    return {
+      isPdf: false,
+      resolvedExtension: normalizedReportedExtension
+    };
+  }
 
   try {
-    const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
-    return header[0] === 0x25 && header[1] === 0x50 && header[2] === 0x44 && header[3] === 0x46;
+    const header = new Uint8Array(await blob.slice(0, 1024).arrayBuffer());
+
+    if (hasPdfSignature(header)) {
+      return {
+        isPdf: true,
+        resolvedExtension: '.pdf'
+      };
+    }
+
+    if (isZipHeader(header)) {
+      try {
+        const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+        const zipEntryNames = Object.keys(zip.files);
+
+        if (zipEntryNames.some((name) => name.startsWith('ppt/'))) {
+          return {
+            isPdf: false,
+            resolvedExtension: '.pptx'
+          };
+        }
+
+        if (zipEntryNames.some((name) => name.startsWith('word/'))) {
+          return {
+            isPdf: false,
+            resolvedExtension: '.docx'
+          };
+        }
+
+        if (zipEntryNames.some((name) => name.startsWith('xl/'))) {
+          return {
+            isPdf: false,
+            resolvedExtension: '.xlsx'
+          };
+        }
+
+        return {
+          isPdf: false,
+          resolvedExtension: normalizedReportedExtension || '.zip'
+        };
+      } catch {
+        return {
+          isPdf: false,
+          resolvedExtension: normalizedReportedExtension
+        };
+      }
+    }
+
+    return {
+      isPdf: false,
+      resolvedExtension: normalizedReportedExtension
+    };
   } catch {
-    return false;
+    return {
+      isPdf: false,
+      resolvedExtension: normalizedReportedExtension
+    };
   }
 }
 
 function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, totalFilesInClass, options = {}) {
   const { subjectName, unitNumber, className, classIndex } = item;
-  const { flattenIntoContentFolder = false } = options;
+  const { flattenIntoContentFolder = false, extensionOverride = fileResult.extension } = options;
   const safeFolderName = sanitizeFilename(subjectName);
   const contentFolder = sanitizeFilename(contentTypeName);
   const numberingPrefix = `${unitNumber}.${classIndex || 1}.${fileNumber}`;
@@ -114,7 +209,7 @@ function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, 
     baseFileName = `${numberingPrefix}_${sanitizeFilename(className)}`;
   }
 
-  const safeFileName = baseFileName + fileResult.extension;
+  const safeFileName = baseFileName + extensionOverride;
 
   if (contentFolder === 'QA' || contentFolder === 'QB' || flattenIntoContentFolder) {
     return `${safeFolderName}/${contentFolder}/${safeFileName}`;
@@ -157,6 +252,14 @@ function buildMergedContentFilePath(subjectName, subjectCode, contentTypeName) {
 function getFilenameFromPath(filePath) {
   const parts = String(filePath || '').split('/');
   return parts[parts.length - 1] || 'file';
+}
+
+function formatErrorMessage(error, fallbackMessage = 'Unknown error') {
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallbackMessage;
 }
 
 async function addFileToZip(zip, filePath, blob, extension) {
@@ -285,7 +388,8 @@ async function getClassMaterialFile(subjectId, classId, contentType = 2) {
 export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2], options = {}) {
   const { mergeOptions = {}, mergeSlides = false } = options;
   const zip = new JSZip();
-  const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, mergeOptions, mergeSlides);
+  const normalizedMergeOptions = normalizeMergeOptions(mergeOptions, mergeSlides);
+  const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, normalizedMergeOptions);
   const enabledMergeContentTypeIds = new Set(enabledMergeContentTypes.map((contentType) => contentType.id));
   const subjectMergeGroups = new Map();
 
@@ -399,20 +503,26 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       if (fileResult.success && fileResult.blob) {
         const fileNumber = i + 1;
         const isMergeSelectedType = enabledMergeContentTypeIds.has(contentType);
+        const reportedExtension = normalizeExtension(fileResult.extension);
+        const fileInspection = await inspectBlobFileType(fileResult.blob, reportedExtension);
+        const resolvedExtension = fileInspection.resolvedExtension || reportedExtension;
+
         const filePath = buildIndividualFilePath(
           item,
           contentTypeName,
           fileResult,
           fileNumber,
           filesArray.length,
-          { flattenIntoContentFolder: isMergeSelectedType }
+          {
+            flattenIntoContentFolder: isMergeSelectedType,
+            extensionOverride: resolvedExtension || fileResult.extension
+          }
         );
-        const normalizedExtension = String(fileResult.extension || '').toLowerCase();
         const canMergeThisFile = isMergeSelectedType;
-        const isMergeablePdf = canMergeThisFile && await isPdfBlob(fileResult.blob);
+        const isMergeablePdf = canMergeThisFile && fileInspection.isPdf;
         const isMergeableOffice = canMergeThisFile
           && !isMergeablePdf
-          && isOfficeConvertibleExtension(normalizedExtension);
+          && isOfficeConvertibleExtension(resolvedExtension);
 
         if (isMergeablePdf || isMergeableOffice) {
           const mergeGroupKey = buildSubjectMergeGroupKey(subjectId, contentType);
@@ -420,7 +530,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           subjectMergeGroups.get(mergeGroupKey)?.files.push({
             item,
             blob: fileResult.blob,
-            extension: normalizedExtension,
+            extension: resolvedExtension,
             unitNumber,
             classIndex: classIndex || 1,
             fileNumber,
@@ -432,7 +542,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
         }
 
         try {
-          await addFileToZip(zip, filePath, fileResult.blob, normalizedExtension || fileResult.extension);
+          await addFileToZip(zip, filePath, fileResult.blob, resolvedExtension || fileResult.extension);
           totalFiles++;
         } catch (error) {
           failed++;
@@ -513,6 +623,11 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
             filesToMerge.push({ item: sourceFile.item, blob: convertedPdfBlob });
           } catch (conversionError) {
+            const conversionErrorMessage = formatErrorMessage(
+              conversionError,
+              `Failed to convert ${sourceFile.fileName} to PDF`
+            );
+
             failed++;
             failedItems.push({
               subjectName: sourceFile.item.subjectName,
@@ -522,7 +637,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
               className: sourceFile.item.className,
               classId: sourceFile.item.classId,
               contentType: subjectGroup.contentTypeName,
-              error: `Failed to convert ${sourceFile.fileName} to PDF: ${conversionError.message || 'Unknown error'}`
+              error: `Failed to convert ${sourceFile.fileName} to PDF: ${conversionErrorMessage}`
             });
 
             try {
