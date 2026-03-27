@@ -3,6 +3,7 @@ import { PDFDocument } from 'pdf-lib';
 import { getCourseMaterials, CONTENT_TYPE_NAMES, CONTENT_TYPE_IDS } from './pesuAPI.js';
 import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
 import { parallelBatch } from './MiscControllers.js';
+import { convertOfficeBlobToPdfWithILovePdf, isOfficeConvertibleExtension } from './ilovepdfHelper.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -117,6 +118,11 @@ function buildMergedSlidesFilePath(subjectName, subjectCode) {
     : 'Merged_Slides.pdf';
 
   return `${safeFolderName}/Slides/${mergedFileName}`;
+}
+
+function getFilenameFromPath(filePath) {
+  const parts = String(filePath || '').split('/');
+  return parts[parts.length - 1] || 'file';
 }
 
 async function addFileToZip(zip, filePath, blob, extension) {
@@ -349,24 +355,31 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
       if (fileResult.success && fileResult.blob) {
         const fileNumber = i + 1;
+        const filePath = buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, filesArray.length);
+        const normalizedExtension = String(fileResult.extension || '').toLowerCase();
         const canMergeThisFile = shouldMergeSlides && contentType === CONTENT_TYPE_IDS.slides;
         const isMergeablePdf = canMergeThisFile && await isPdfBlob(fileResult.blob);
+        const isMergeableOffice = canMergeThisFile
+          && !isMergeablePdf
+          && isOfficeConvertibleExtension(normalizedExtension);
 
-        if (isMergeablePdf) {
+        if (isMergeablePdf || isMergeableOffice) {
           subjectSlideGroups.get(subjectId)?.files.push({
             item,
             blob: fileResult.blob,
+            extension: normalizedExtension,
             unitNumber,
             classIndex: classIndex || 1,
-            fileNumber
+            fileNumber,
+            isPdf: isMergeablePdf,
+            filePath,
+            fileName: getFilenameFromPath(filePath)
           });
           continue;
         }
 
-        const filePath = buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, filesArray.length);
-
         try {
-          await addFileToZip(zip, filePath, fileResult.blob, fileResult.extension);
+          await addFileToZip(zip, filePath, fileResult.blob, normalizedExtension || fileResult.extension);
           totalFiles++;
         } catch (error) {
           failed++;
@@ -429,7 +442,59 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       });
 
       try {
-        const mergeResult = await mergeSubjectSlidePdfs(subjectGroup.files);
+        const filesToMerge = [];
+
+        for (const sourceFile of subjectGroup.files) {
+          if (sourceFile.isPdf) {
+            filesToMerge.push({ item: sourceFile.item, blob: sourceFile.blob });
+            continue;
+          }
+
+          try {
+            const convertedPdfBlob = await convertOfficeBlobToPdfWithILovePdf({
+              blob: sourceFile.blob,
+              filename: sourceFile.fileName,
+              extension: sourceFile.extension
+            });
+
+            filesToMerge.push({ item: sourceFile.item, blob: convertedPdfBlob });
+          } catch (conversionError) {
+            failed++;
+            failedItems.push({
+              subjectName: sourceFile.item.subjectName,
+              subjectCode: sourceFile.item.subjectCode,
+              subjectId: sourceFile.item.subjectId,
+              unitNumber: sourceFile.item.unitNumber,
+              className: sourceFile.item.className,
+              classId: sourceFile.item.classId,
+              contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
+              error: `Failed to convert ${sourceFile.fileName} to PDF: ${conversionError.message || 'Unknown error'}`
+            });
+
+            try {
+              await addFileToZip(zip, sourceFile.filePath, sourceFile.blob, sourceFile.extension);
+              totalFiles++;
+            } catch (zipError) {
+              failed++;
+              failedItems.push({
+                subjectName: sourceFile.item.subjectName,
+                subjectCode: sourceFile.item.subjectCode,
+                subjectId: sourceFile.item.subjectId,
+                unitNumber: sourceFile.item.unitNumber,
+                className: sourceFile.item.className,
+                classId: sourceFile.item.classId,
+                contentType: CONTENT_TYPE_NAMES[CONTENT_TYPE_IDS.slides],
+                error: zipError.message || 'Failed to add original non-PDF slide to ZIP after conversion failure'
+              });
+            }
+          }
+        }
+
+        if (filesToMerge.length === 0) {
+          continue;
+        }
+
+        const mergeResult = await mergeSubjectSlidePdfs(filesToMerge);
 
         for (const mergeFailure of mergeResult.mergeFailures) {
           failed++;

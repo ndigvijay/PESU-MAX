@@ -5,12 +5,15 @@ import {
   DialogContent,
   DialogActions,
   Typography,
-  Button
+  Button,
+  Box,
+  IconButton
 } from "@mui/material";
 import MergeTypeIcon from "@mui/icons-material/MergeType";
+import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx } from "../../styles/styles.js";
 
-const MergeSlidesDialog = ({ open, onClose, onConfirm }) => {
+const MergeSlidesDialog = ({ open, onClose, onConfirm, onBack }) => {
   return (
     <Dialog
       open={open}
@@ -19,15 +22,27 @@ const MergeSlidesDialog = ({ open, onClose, onConfirm }) => {
       fullWidth
       PaperProps={{ sx: dialogPaperSx }}
     >
-      <DialogTitle sx={dialogTitleSx}>
-        Merge Slides
+      <DialogTitle sx={{ ...dialogTitleSx, paddingBottom: "4px" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          <IconButton
+            size="small"
+            onClick={onBack || onClose}
+            sx={{ color: "#233a76", padding: "2px" }}
+            aria-label="Back"
+          >
+            <KeyboardBackspaceIcon fontSize="small" />
+          </IconButton>
+          <Typography component="span" sx={{ fontSize: "16px", fontWeight: "bold", color: "inherit" }}>
+            Merge Slides
+          </Typography>
+        </Box>
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: "#666", fontSize: "12px", lineHeight: 1.6 }}>
-          Do you want to merge the selected slide PDFs subject-wise?
+          Do you want to merge selected slide files subject-wise into one PDF?
         </Typography>
         <Typography variant="body2" sx={{ color: "#888", fontSize: "11px", mt: 1 }}>
-          Each subject will get one merged PDF inside the ZIP. Non-PDF slide files will stay separate.
+          PDF files are merged directly. PPT/PPTX and DOC/DOCX files are converted to PDF first. Files that fail conversion stay separate.
         </Typography>
       </DialogContent>
       <DialogActions sx={{ padding: "8px 24px 16px", gap: 1 }}>

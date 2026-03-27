@@ -14,7 +14,9 @@
     "https://files.pesuacademy.com/*",
     "https://staff.pes.edu/*",
     "http://library.pes.edu/*",
-    "https://library.pes.edu/*"
+    "https://library.pes.edu/*",
+    "https://www.ilovepdf.com/*",
+    "https://*.ilovepdf.com/*"
   ],
   "content_scripts": [
     {
