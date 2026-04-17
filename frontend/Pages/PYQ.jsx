@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   FormControl,
   IconButton,
@@ -21,16 +22,19 @@ import { setCurrentPage } from "../redux/sidebarSlice.js";
 import {
   clearDownloadFeedback,
   downloadPyq,
+  downloadSelectedPyqsZip,
   initLibraryAuth,
   loadPyqCatalog,
   resetPyqState,
   searchPyqs,
+  setSelectedPyqs,
   setCourseSearch,
   setCurrentStep,
   setSearchQuery,
   setSelectedCourse,
   setSelectedSemester,
-  setSemesterFilter
+  setSemesterFilter,
+  togglePyqSelection
 } from "../redux/pyqSlice.js";
 import theme from "../Themes/theme.jsx";
 import { selectSx } from "../styles/styles.js";
@@ -55,6 +59,7 @@ const PYQ = () => {
     semesterFilter,
     selectedSemester,
     selectedCourse,
+    selectedPyqs,
     courseSearch,
     searchQuery,
     searchResults,
@@ -67,8 +72,11 @@ const PYQ = () => {
     searchLoading,
     searchError,
     downloadingItemId,
+    bulkDownloading,
     downloadSuccessItemId,
-    downloadError
+    downloadError,
+    bulkDownloadResult,
+    bulkDownloadError
   } = useSelector((state) => state.pyq);
 
   useEffect(() => {
@@ -104,6 +112,19 @@ const PYQ = () => {
         course.subjectName.toLowerCase().includes(query)
     );
   }, [courses, selectedSemester, courseSearch]);
+
+  const selectableResults = useMemo(
+    () => searchResults.filter((item) => item.downloadPath),
+    [searchResults]
+  );
+
+  const selectedCount = useMemo(
+    () => selectableResults.filter((item) => selectedPyqs[item.id]).length,
+    [selectableResults, selectedPyqs]
+  );
+
+  const allSelectableSelected =
+    selectableResults.length > 0 && selectedCount === selectableResults.length;
 
   const handleBack = () => {
     if (currentStep === "results") {
@@ -154,6 +175,44 @@ const PYQ = () => {
         itemId: item.id,
         downloadPath: item.downloadPath,
         title: item.title
+      })
+    );
+  };
+
+  const handleToggleSelection = (itemId) => {
+    dispatch(togglePyqSelection(itemId));
+  };
+
+  const handleToggleSelectAll = () => {
+    if (allSelectableSelected) {
+      dispatch(setSelectedPyqs({}));
+      return;
+    }
+
+    const nextSelection = {};
+    selectableResults.forEach((item) => {
+      nextSelection[item.id] = true;
+    });
+    dispatch(setSelectedPyqs(nextSelection));
+  };
+
+  const handleBulkDownload = () => {
+    const selectedItems = selectableResults
+      .filter((item) => selectedPyqs[item.id])
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        downloadPath: item.downloadPath
+      }));
+
+    if (selectedItems.length === 0) {
+      return;
+    }
+
+    dispatch(
+      downloadSelectedPyqsZip({
+        items: selectedItems,
+        query: lastQuery || searchQuery || selectedCourse?.subjectCode || "PYQs"
       })
     );
   };
@@ -219,7 +278,7 @@ const PYQ = () => {
           {currentStep === "semesters" && (
             <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
               <Typography sx={{ fontSize: "13px", color: "#555", marginBottom: "8px" }}>
-                Step 1: Select semester
+                Select semester
               </Typography>
 
               <FormControl fullWidth size="small" sx={{ marginBottom: "12px" }}>
@@ -272,7 +331,7 @@ const PYQ = () => {
           {currentStep === "courses" && (
             <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
               <Typography sx={{ fontSize: "13px", color: "#555", marginBottom: "8px" }}>
-                Step 2: Select course from Semester {selectedSemester}
+                Select course from Semester {selectedSemester}
               </Typography>
 
               <TextField
@@ -319,7 +378,7 @@ const PYQ = () => {
           {currentStep === "results" && (
             <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
               <Typography sx={{ fontSize: "13px", color: "#555", marginBottom: "8px" }}>
-                Step 3: Search and download PYQs
+                Search and download PYQs
               </Typography>
 
               {selectedCourse && (
@@ -368,13 +427,28 @@ const PYQ = () => {
                 </Alert>
               )}
 
+              {bulkDownloadError && (
+                <Alert severity="error" sx={{ marginBottom: "10px", fontSize: "12px" }}>
+                  {bulkDownloadError}
+                </Alert>
+              )}
+
               {downloadSuccessItemId && (
                 <Alert severity="success" sx={{ marginBottom: "10px", fontSize: "12px" }}>
                   Download started successfully.
                 </Alert>
               )}
 
-              {searchLoading && (
+              {bulkDownloadResult && (
+                <Alert severity="success" sx={{ marginBottom: "10px", fontSize: "12px" }}>
+                  ZIP download started for {bulkDownloadResult.stats?.successful || 0} PYQs.
+                  {(bulkDownloadResult.stats?.failed || 0) > 0
+                    ? ` ${bulkDownloadResult.stats.failed} item(s) could not be added.`
+                    : ""}
+                </Alert>
+              )}
+
+              {(searchLoading || bulkDownloading) && (
                 <Box
                   sx={{
                     display: "flex",
@@ -392,7 +466,7 @@ const PYQ = () => {
                 </Box>
               )}
 
-              {!searchLoading && (
+              {!searchLoading && !bulkDownloading && (
                 <Typography sx={{ fontSize: "12px", color: "#666", marginBottom: "8px" }}>
                   {lastQuery
                     ? `${totalResults} result${totalResults === 1 ? "" : "s"} for "${lastQuery}"`
@@ -401,6 +475,51 @@ const PYQ = () => {
               )}
 
               <Box sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
+                {!searchLoading && !bulkDownloading && searchResults.length > 0 && (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      ...rowCardSx,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "12px"
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Checkbox
+                        size="small"
+                        checked={allSelectableSelected}
+                        indeterminate={selectedCount > 0 && !allSelectableSelected}
+                        onChange={handleToggleSelectAll}
+                        sx={{
+                          color: theme.colors.primary,
+                          "&.Mui-checked": { color: theme.colors.primary }
+                        }}
+                      />
+                      <Typography sx={{ fontSize: "12px", color: theme.colors.secondary, fontWeight: 600 }}>
+                        {selectedCount} selected
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<DownloadIcon fontSize="small" />}
+                      onClick={handleBulkDownload}
+                      disabled={selectedCount === 0 || bulkDownloading || searchLoading}
+                      sx={{
+                        backgroundColor: theme.colors.primary,
+                        textTransform: "none",
+                        minWidth: "122px",
+                        "&:hover": { backgroundColor: theme.colors.primaryHover }
+                      }}
+                    >
+                      {bulkDownloading ? "Creating ZIP" : "Download ZIP"}
+                    </Button>
+                  </Paper>
+                )}
+
                 {searchResults.map((item) => (
                   <Paper key={item.id} elevation={0} sx={rowCardSx}>
                     <Box sx={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
@@ -428,6 +547,18 @@ const PYQ = () => {
                       </Box>
 
                       <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <Checkbox
+                          size="small"
+                          checked={!!selectedPyqs[item.id]}
+                          disabled={!item.downloadPath || searchLoading || bulkDownloading}
+                          onChange={() => handleToggleSelection(item.id)}
+                          sx={{
+                            padding: "2px",
+                            color: theme.colors.primary,
+                            "&.Mui-checked": { color: theme.colors.primary }
+                          }}
+                        />
+
                         <Button
                           component="a"
                           href={item.downloadUrl}
@@ -473,7 +604,8 @@ const PYQ = () => {
                           disabled={
                             !item.downloadPath ||
                             downloadingItemId === item.id ||
-                            searchLoading
+                            searchLoading ||
+                            bulkDownloading
                           }
                           sx={{
                             backgroundColor: theme.colors.secondary,

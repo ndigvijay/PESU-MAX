@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import * as cheerio from "cheerio";
 import { load, save } from "../utils/storage.js";
 
@@ -382,6 +383,15 @@ function arrayBufferToBase64(arrayBuffer) {
   return btoa(binary);
 }
 
+function ensurePdfExtension(name) {
+  return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
+}
+
+function buildZipFileName(query) {
+  const safeQuery = sanitizeFilename(query || "PYQs") || "PYQs";
+  return `PESU_PYQs_${safeQuery}.zip`;
+}
+
 function triggerBrowserDownload(url, filename) {
   return new Promise((resolve, reject) => {
     chrome.downloads.download(
@@ -556,5 +566,86 @@ export async function downloadLibraryPyq({
     downloadId,
     fileName,
     sourceUrl: absoluteUrl
+  };
+}
+
+export async function downloadLibraryPyqsZip({
+  items,
+  query,
+  encodedMemberId,
+  encodedPassword
+}) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("No PYQs selected for ZIP download");
+  }
+
+  await ensureLibrarySession(encodedMemberId, encodedPassword);
+
+  const zip = new JSZip();
+  const failedItems = [];
+  let successful = 0;
+
+  await Promise.all(
+    items.map(async (item, index) => {
+      try {
+        const absoluteUrl = toAbsoluteLibraryUrl(item.downloadPath);
+        if (!absoluteUrl) {
+          throw new Error("Invalid download URL");
+        }
+
+        const fileResponse = await fetch(absoluteUrl, {
+          method: "GET",
+          credentials: "include"
+        });
+
+        if (!fileResponse.ok) {
+          throw new Error(`HTTP ${fileResponse.status}`);
+        }
+
+        const fileBlob = await fileResponse.blob();
+        const fileBuffer = await fileBlob.arrayBuffer();
+        const fallbackName = `PYQ_${index + 1}`;
+        const safeName = sanitizeFilename(item.title || fallbackName) || fallbackName;
+        const fileName = `${String(index + 1).padStart(2, "0")}_${ensurePdfExtension(safeName)}`;
+
+        zip.file(fileName, fileBuffer, {
+          binary: true,
+          compression: "STORE"
+        });
+        successful += 1;
+      } catch (error) {
+        failedItems.push({
+          id: item.id,
+          title: item.title || "Unknown PYQ",
+          error: error.message || "Unknown error"
+        });
+      }
+    })
+  );
+
+  if (successful === 0) {
+    throw new Error("Unable to download selected PYQs");
+  }
+
+  const zipBlob = await zip.generateAsync({
+    type: "blob",
+    compression: "DEFLATE",
+    compressionOptions: { level: 4 }
+  });
+  const zipBuffer = await zipBlob.arrayBuffer();
+  const zipBase64 = arrayBufferToBase64(zipBuffer);
+  const zipDataUrl = `data:application/zip;base64,${zipBase64}`;
+  const fileName = buildZipFileName(query);
+  const downloadId = await triggerBrowserDownload(zipDataUrl, `PESU_PYQs/${fileName}`);
+
+  return {
+    downloadId,
+    fileName,
+    stats: {
+      total: items.length,
+      successful,
+      failed: failedItems.length,
+      failedItems
+    }
   };
 }

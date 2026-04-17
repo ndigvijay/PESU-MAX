@@ -8,6 +8,7 @@ import { getAttendance, getSemesterGpa } from "../helpers/pesuAPI.js";
 import { parseAttendance, parseGpaData } from "../helpers/parser.js";
 import {
   downloadLibraryPyq,
+  downloadLibraryPyqsZip,
   getPyqCourseCatalog,
   loginLibraryWithCredentials,
   searchLibraryPyqs
@@ -147,6 +148,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     downloadLibraryPyq({
       downloadPath: request.downloadPath,
       title: request.title,
+      encodedMemberId: request.encodedMemberId,
+      encodedPassword: request.encodedPassword
+    })
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "downloadLibraryPyqsZip") {
+    downloadLibraryPyqsZip({
+      items: request.items,
+      query: request.query,
       encodedMemberId: request.encodedMemberId,
       encodedPassword: request.encodedPassword
     })

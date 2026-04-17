@@ -51,3 +51,18 @@ export const downloadCoursePyq = ({
     encodedPassword
   });
 };
+
+export const downloadSelectedCoursePyqsZip = ({
+  items,
+  query,
+  encodedMemberId,
+  encodedPassword
+}) => {
+  return sendRuntimeMessage({
+    action: "downloadLibraryPyqsZip",
+    items,
+    query,
+    encodedMemberId,
+    encodedPassword
+  });
+};
