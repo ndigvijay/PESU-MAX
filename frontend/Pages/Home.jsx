@@ -107,20 +107,6 @@ const Home = () => {
           >
             Know your Faculty
           </Button>)}
-          {isLoggedIn && (<Button
-            variant="contained"
-            sx={{
-              backgroundColor: theme.colors.secondary,
-              width: '100%',
-              textAlign: 'center',
-              padding: '12px'
-            }}
-            onClick={() => {
-              dispatch(setCurrentPage("pyq"));
-            }}
-          >
-            Download PYQs
-          </Button>)}
         </Box>
     </Box>
    );

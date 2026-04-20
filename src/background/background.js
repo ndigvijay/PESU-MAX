@@ -6,13 +6,6 @@ import { getSemestersData } from "../helpers/MiscControllers.js";
 import { searchProfessors, getProfessorDetails } from "../services/pesuStaff.js";
 import { getAttendance, getSemesterGpa } from "../helpers/pesuAPI.js";
 import { parseAttendance, parseGpaData } from "../helpers/parser.js";
-import {
-  downloadLibraryPyq,
-  downloadLibraryPyqsZip,
-  getPyqCourseCatalog,
-  loginLibraryWithCredentials,
-  searchLibraryPyqs
-} from "../services/libraryPyq.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -116,57 +109,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  if (request.action === "libraryLogin") {
-    loginLibraryWithCredentials({
-      encodedMemberId: request.encodedMemberId,
-      encodedPassword: request.encodedPassword
-    })
-      .then((data) => sendResponse({ data }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "getPYQCourseCatalog") {
-    getPyqCourseCatalog()
-      .then((data) => sendResponse({ data }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "searchLibraryPyqs") {
-    searchLibraryPyqs({
-      query: request.query,
-      encodedMemberId: request.encodedMemberId,
-      encodedPassword: request.encodedPassword
-    })
-      .then((data) => sendResponse({ data }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "downloadLibraryPyq") {
-    downloadLibraryPyq({
-      downloadPath: request.downloadPath,
-      title: request.title,
-      encodedMemberId: request.encodedMemberId,
-      encodedPassword: request.encodedPassword
-    })
-      .then((data) => sendResponse({ data }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "downloadLibraryPyqsZip") {
-    downloadLibraryPyqsZip({
-      items: request.items,
-      query: request.query,
-      encodedMemberId: request.encodedMemberId,
-      encodedPassword: request.encodedPassword
-    })
-      .then((data) => sendResponse({ data }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
 });
 
 // Initialize data sync with alarms

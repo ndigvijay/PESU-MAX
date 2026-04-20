@@ -45,6 +45,3 @@ export const DEFAULT_MERGE_SELECTION = {
   notes: false,
   assignments: false
 };
-
-export const LIBRARY_MEMBER_ID_BASE64 = "UEVTMTIwMjEwMjM5MA==";
-export const LIBRARY_PASSWORD_BASE64 = "Nmo0UGVRQVg=";
