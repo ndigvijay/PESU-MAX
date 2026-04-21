@@ -356,7 +356,7 @@ function parseSearchResults(payload, query) {
   };
 }
 
-function buildSearchPayload({ query, viewState, eventValidation, viewStateGenerator }) {
+function buildSearchPayload({ query, year, viewState, eventValidation, viewStateGenerator }) {
   return new URLSearchParams({
     ToolkitScriptManager1: "UpdatePanel1|cmdSearch",
     __EVENTTARGET: "",
@@ -369,7 +369,7 @@ function buildSearchPayload({ query, viewState, eventValidation, viewStateGenera
     txtPassword: "",
     txtTitle: query,
     txtAuthor: "",
-    txtYear: "",
+    txtYear: year || "",
     txtSubject: "",
     txtCallno: "",
     txtPublisher: "",
@@ -382,14 +382,14 @@ function buildSearchPayload({ query, viewState, eventValidation, viewStateGenera
   });
 }
 
-function buildPaginationPayload({ query, viewState, eventValidation, viewStateGenerator, direction = "next" }) {
+function buildPaginationPayload({ query, year, viewState, eventValidation, viewStateGenerator, direction = "next" }) {
   return new URLSearchParams({
     ToolkitScriptManager1: `UpdatePanel1|${LIBRARY_GRID_EVENT_TARGET}`,
     txtMemberid: "",
     txtPassword: "",
     txtTitle: query,
     txtAuthor: "",
-    txtYear: "",
+    txtYear: year || "",
     txtSubject: "",
     txtCallno: "",
     txtPublisher: "",
@@ -575,8 +575,9 @@ export async function loginLibraryWithCredentials({ encodedMemberId, encodedPass
   return loginToLibrary(encodedMemberId, encodedPassword);
 }
 
-export async function searchLibraryPyqs({ query, encodedMemberId, encodedPassword }) {
+export async function searchLibraryPyqs({ query, year, encodedMemberId, encodedPassword }) {
   const cleanQuery = normalizeText(query);
+  const cleanYear = normalizeText(year);
   if (!cleanQuery) {
     throw new Error("Search query is required");
   }
@@ -594,6 +595,7 @@ export async function searchLibraryPyqs({ query, encodedMemberId, encodedPasswor
 
   const payload = buildSearchPayload({
     query: cleanQuery,
+    year: cleanYear,
     viewState,
     eventValidation,
     viewStateGenerator
@@ -631,12 +633,14 @@ export async function searchLibraryPyqs({ query, encodedMemberId, encodedPasswor
 
 export async function loadMoreLibraryPyqs({
   query,
+  year,
   cursor,
   loadedCount = 0,
   encodedMemberId,
   encodedPassword
 }) {
   const cleanQuery = normalizeText(query || cursor?.query);
+  const cleanYear = normalizeText(year);
   if (!cleanQuery) {
     throw new Error("Search query is required");
   }
@@ -648,6 +652,7 @@ export async function loadMoreLibraryPyqs({
   const auth = await ensureLibrarySession(encodedMemberId, encodedPassword);
   const payload = buildPaginationPayload({
     query: cleanQuery,
+    year: cleanYear,
     viewState: cursor.viewState,
     eventValidation: cursor.eventValidation,
     viewStateGenerator: cursor.viewStateGenerator,

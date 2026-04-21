@@ -12,6 +12,8 @@ import {
   LIBRARY_PASSWORD_BASE64
 } from "../constants/constants.js";
 
+const DEFAULT_PYQ_YEAR = String(new Date().getFullYear());
+
 export const initLibraryAuth = createAsyncThunk(
   "pyq/initLibraryAuth",
   async (_, { rejectWithValue }) => {
@@ -39,10 +41,11 @@ export const loadPyqCatalog = createAsyncThunk(
 
 export const searchPyqs = createAsyncThunk(
   "pyq/searchPyqs",
-  async (query, { rejectWithValue }) => {
+  async ({ query, year }, { rejectWithValue }) => {
     try {
       return await searchCoursePyqs({
         query,
+        year,
         encodedMemberId: LIBRARY_MEMBER_ID_BASE64,
         encodedPassword: LIBRARY_PASSWORD_BASE64
       });
@@ -64,6 +67,7 @@ export const loadMorePyqs = createAsyncThunk(
     try {
       return await loadMoreCoursePyqs({
         query: pyq.lastQuery,
+        year: pyq.selectedYear,
         cursor: pyq.nextPageCursor,
         loadedCount: pyq.searchResults.length,
         encodedMemberId: LIBRARY_MEMBER_ID_BASE64,
@@ -121,6 +125,7 @@ const initialState = {
   searchResults: [],
   totalResults: 0,
   lastQuery: "",
+  selectedYear: DEFAULT_PYQ_YEAR,
   hasMore: false,
   nextPageCursor: null,
   catalogLoading: false,
@@ -177,6 +182,7 @@ const pyqSlice = createSlice({
       state.searchResults = [];
       state.totalResults = 0;
       state.lastQuery = "";
+      state.selectedYear = DEFAULT_PYQ_YEAR;
       state.hasMore = false;
       state.nextPageCursor = null;
       state.searchQuery = "";
@@ -186,10 +192,11 @@ const pyqSlice = createSlice({
     setSelectedCourse: (state, action) => {
       state.selectedCourse = action.payload;
       state.selectedPyqs = {};
-      state.searchQuery = action.payload?.subjectCode || "";
+      state.searchQuery = action.payload?.subjectName || "";
       state.searchResults = [];
       state.totalResults = 0;
       state.lastQuery = "";
+      state.selectedYear = DEFAULT_PYQ_YEAR;
       state.hasMore = false;
       state.nextPageCursor = null;
       state.searchError = null;
@@ -204,6 +211,12 @@ const pyqSlice = createSlice({
     },
     setSearchQuery: (state, action) => {
       state.searchQuery = action.payload;
+      state.searchError = null;
+      state.loadMoreError = null;
+      state.downloadSuccessItemId = null;
+    },
+    setSelectedYear: (state, action) => {
+      state.selectedYear = action.payload;
       state.searchError = null;
       state.loadMoreError = null;
       state.downloadSuccessItemId = null;
@@ -355,6 +368,7 @@ export const {
   setSemesterFilter,
   setSelectedSemester,
   setSelectedCourse,
+  setSelectedYear,
   setCourseSearch,
   setSearchQuery,
   togglePyqSelection,

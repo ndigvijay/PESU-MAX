@@ -33,6 +33,7 @@ import {
   setCurrentStep,
   setSearchQuery,
   setSelectedCourse,
+  setSelectedYear,
   setSelectedSemester,
   setSemesterFilter,
   togglePyqSelection
@@ -64,6 +65,8 @@ const blueAlertSx = {
 
 const loadingText = "fetching resources from library";
 const authLoadingText = "fetching resources from library\nplease wait a few seconds";
+const DEFAULT_PYQ_YEAR = String(new Date().getFullYear());
+const PYQ_YEAR_OPTIONS = Array.from({ length: 5 }, (_, index) => String(new Date().getFullYear() - index));
 
 const PYQ = () => {
   const dispatch = useDispatch();
@@ -82,6 +85,7 @@ const PYQ = () => {
     searchResults,
     totalResults,
     lastQuery,
+    selectedYear,
     hasMore,
     nextPageCursor,
     catalogLoading,
@@ -214,7 +218,7 @@ const PYQ = () => {
   const handleSelectCourse = (course) => {
     dispatch(setSelectedCourse(course));
     dispatch(setCurrentStep("results"));
-    dispatch(searchPyqs(course.subjectCode));
+    dispatch(searchPyqs({ query: course.subjectName, year: DEFAULT_PYQ_YEAR }));
   };
 
   const handleSearch = () => {
@@ -223,7 +227,20 @@ const PYQ = () => {
       return;
     }
 
-    dispatch(searchPyqs(query));
+    dispatch(searchPyqs({ query, year: selectedYear }));
+  };
+
+  const handleYearChange = (event) => {
+    const nextYear = event.target.value;
+    const query = searchQuery.trim();
+
+    dispatch(setSelectedYear(nextYear));
+
+    if (!query) {
+      return;
+    }
+
+    dispatch(searchPyqs({ query, year: nextYear }));
   };
 
   const handleSearchKey = (event) => {
@@ -275,7 +292,7 @@ const PYQ = () => {
     dispatch(
       downloadSelectedPyqsZip({
         items: selectedItems,
-        query: lastQuery || searchQuery || selectedCourse?.subjectCode || "PYQs"
+        query: lastQuery || searchQuery || selectedCourse?.subjectName || "PYQs"
       })
     );
   };
@@ -463,15 +480,28 @@ const PYQ = () => {
                 </Paper>
               )}
 
-              <Box sx={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+              <Box sx={{ display: "flex", gap: "8px", marginBottom: "10px", alignItems: "stretch" }}>
                 <TextField
                   fullWidth
                   size="small"
-                  placeholder="Custom title search (e.g. UE21MA141A)"
+                  placeholder="Search subject or title"
                   value={searchQuery}
                   onChange={(event) => dispatch(setSearchQuery(event.target.value))}
                   onKeyDown={handleSearchKey}
                 />
+                <FormControl size="small" sx={{ minWidth: "92px" }}>
+                  <Select
+                    value={selectedYear}
+                    onChange={handleYearChange}
+                    sx={selectSx}
+                  >
+                    {PYQ_YEAR_OPTIONS.map((year) => (
+                      <MenuItem key={year} value={year}>
+                        {year}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
                 <Button
                   variant="contained"
                   onClick={handleSearch}
@@ -750,6 +780,17 @@ const PYQ = () => {
                     )}
                   </Box>
                 )}
+
+                <Typography
+                  sx={{
+                    fontSize: "11px",
+                    color: "#9a9a9a",
+                    textAlign: "center",
+                    paddingBottom: "10px"
+                  }}
+                >
+                  Tip: change year to fetch more papers
+                </Typography>
               </Box>
             </Box>
           )}

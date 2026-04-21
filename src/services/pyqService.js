@@ -28,19 +28,21 @@ export const fetchPyqCatalog = () => {
   return sendRuntimeMessage({ action: "getPYQCourseCatalog" });
 };
 
-export const searchCoursePyqs = ({ query, encodedMemberId, encodedPassword }) => {
+export const searchCoursePyqs = ({ query, year, encodedMemberId, encodedPassword }) => {
   return sendRuntimeMessage({
     action: "searchLibraryPyqs",
     query,
+    year,
     encodedMemberId,
     encodedPassword
   });
 };
 
-export const loadMoreCoursePyqs = ({ query, cursor, loadedCount, encodedMemberId, encodedPassword }) => {
+export const loadMoreCoursePyqs = ({ query, year, cursor, loadedCount, encodedMemberId, encodedPassword }) => {
   return sendRuntimeMessage({
     action: "loadMoreLibraryPyqs",
     query,
+    year,
     cursor,
     loadedCount,
     encodedMemberId,

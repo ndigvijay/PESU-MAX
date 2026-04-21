@@ -137,6 +137,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "searchLibraryPyqs") {
     searchLibraryPyqs({
       query: request.query,
+      year: request.year,
       encodedMemberId: request.encodedMemberId,
       encodedPassword: request.encodedPassword
     })
@@ -148,6 +149,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "loadMoreLibraryPyqs") {
     loadMoreLibraryPyqs({
       query: request.query,
+      year: request.year,
       cursor: request.cursor,
       loadedCount: request.loadedCount,
       encodedMemberId: request.encodedMemberId,
