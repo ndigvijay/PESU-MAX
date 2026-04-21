@@ -5,6 +5,7 @@ import { load, save } from "../utils/storage.js";
 const LIBRARY_BASE_URL = "http://library.pes.edu";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyPage.aspx`;
 const SEARCH_URL = `${LIBRARY_BASE_URL}/Search.aspx`;
+const LIBRARY_GRID_EVENT_TARGET = "GridView1";
 
 function normalizeText(value) {
   return (value || "").replace(/\s+/g, " ").trim();
@@ -306,9 +307,10 @@ function parseResultRow($, rowElement, index) {
 
   const courseCodeMatch = title.match(/\(([A-Z0-9]+)\)\s*$/i);
   const courseCode = courseCodeMatch?.[1] || "";
+  const stableId = downloadPath || recordId || `${title}-${yearEdition}-${callNo}-${index}`;
 
   return {
-    id: `${downloadPath || title}-${index}`,
+    id: stableId,
     title,
     courseCode,
     yearEdition,
@@ -333,18 +335,28 @@ function parseSearchResults(payload, query) {
 
   const labelTotal = parseInt(normalizeText($("#Label2").first().text()), 10);
   const regexTotalMatch = payload.match(/Total Search Results:\s*<span[^>]*>\s*(\d+)\s*<\/span>/i);
+  const deltaLabelMatch = payload.match(/\bLabel2\|\s*(\d+)\b/i);
+  const genericLabelMatch = payload.match(/id=["']Label2["'][^>]*>\s*(\d+)\s*</i);
   const regexTotal = regexTotalMatch ? parseInt(regexTotalMatch[1], 10) : NaN;
+  const deltaTotal = deltaLabelMatch ? parseInt(deltaLabelMatch[1], 10) : NaN;
+  const genericLabelTotal = genericLabelMatch ? parseInt(genericLabelMatch[1], 10) : NaN;
+  const hasNextPage = /Page\$Next/i.test(payload);
 
   return {
     query,
     totalResults: Number.isFinite(labelTotal)
       ? labelTotal
-      : (Number.isFinite(regexTotal) ? regexTotal : parsedResults.length),
-    results: parsedResults
+      : (Number.isFinite(regexTotal)
+          ? regexTotal
+          : (Number.isFinite(deltaTotal)
+              ? deltaTotal
+              : (Number.isFinite(genericLabelTotal) ? genericLabelTotal : parsedResults.length))),
+    results: parsedResults,
+    hasNextPage
   };
 }
 
-function buildSearchPayload({ query, viewState, eventValidation, viewStateGenerator }) {
+function buildSearchPayload({ query, year, viewState, eventValidation, viewStateGenerator }) {
   return new URLSearchParams({
     ToolkitScriptManager1: "UpdatePanel1|cmdSearch",
     __EVENTTARGET: "",
@@ -357,7 +369,7 @@ function buildSearchPayload({ query, viewState, eventValidation, viewStateGenera
     txtPassword: "",
     txtTitle: query,
     txtAuthor: "",
-    txtYear: "",
+    txtYear: year || "",
     txtSubject: "",
     txtCallno: "",
     txtPublisher: "",
@@ -368,6 +380,95 @@ function buildSearchPayload({ query, viewState, eventValidation, viewStateGenera
     __ASYNCPOST: "true",
     cmdSearch: "Search"
   });
+}
+
+function buildPaginationPayload({ query, year, viewState, eventValidation, viewStateGenerator, direction = "next" }) {
+  return new URLSearchParams({
+    ToolkitScriptManager1: `UpdatePanel1|${LIBRARY_GRID_EVENT_TARGET}`,
+    txtMemberid: "",
+    txtPassword: "",
+    txtTitle: query,
+    txtAuthor: "",
+    txtYear: year || "",
+    txtSubject: "",
+    txtCallno: "",
+    txtPublisher: "",
+    cmbCategory: "",
+    txtLocation: "",
+    txtEdition: "",
+    txtAccessNo: "",
+    __EVENTTARGET: LIBRARY_GRID_EVENT_TARGET,
+    __EVENTARGUMENT: direction === "prev" ? "Page$Prev" : "Page$Next",
+    __VIEWSTATE: viewState,
+    __VIEWSTATEGENERATOR: viewStateGenerator,
+    __VIEWSTATEENCRYPTED: "",
+    __EVENTVALIDATION: eventValidation,
+    __ASYNCPOST: "true"
+  });
+}
+
+async function sendLibrarySearchRequest(formData) {
+  const searchResponse = await fetch(SEARCH_URL, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "X-Requested-With": "XMLHttpRequest",
+      "X-MicrosoftAjax": "Delta=true"
+    },
+    body: formData.toString()
+  });
+
+  const responseText = await searchResponse.text();
+
+  if (!searchResponse.ok) {
+    throw new Error(`Library search failed (HTTP ${searchResponse.status})`);
+  }
+
+  return responseText;
+}
+
+function buildNextCursor({ query, fields, pageIndex, pageSize }) {
+  if (!fields.viewState || !fields.eventValidation) {
+    return null;
+  }
+
+  return {
+    query,
+    viewState: fields.viewState,
+    eventValidation: fields.eventValidation,
+    viewStateGenerator: fields.viewStateGenerator,
+    pageIndex,
+    pageSize
+  };
+}
+
+function buildPaginatedSearchResponse({ query, parsed, fields, pageIndex, loadedCount = 0, pageSize = parsed.results.length }) {
+  const normalizedLoadedCount = Number.isFinite(loadedCount) ? loadedCount : 0;
+  const normalizedPageSize = Number.isFinite(pageSize) && pageSize > 0
+    ? pageSize
+    : parsed.results.length;
+  const loadedAfterPage = normalizedLoadedCount + parsed.results.length;
+  const derivedTotalResults = Math.max(
+    parsed.totalResults || 0,
+    loadedAfterPage + (parsed.hasNextPage ? 1 : 0)
+  );
+  const hasMore = Boolean(parsed.hasNextPage || loadedAfterPage < derivedTotalResults);
+
+  return {
+    query,
+    totalResults: derivedTotalResults,
+    results: parsed.results,
+    hasMore,
+    nextCursor: hasMore
+      ? buildNextCursor({
+          query,
+          fields,
+          pageIndex,
+          pageSize: normalizedPageSize
+        })
+      : null
+  };
 }
 
 function arrayBufferToBase64(arrayBuffer) {
@@ -474,8 +575,9 @@ export async function loginLibraryWithCredentials({ encodedMemberId, encodedPass
   return loginToLibrary(encodedMemberId, encodedPassword);
 }
 
-export async function searchLibraryPyqs({ query, encodedMemberId, encodedPassword }) {
+export async function searchLibraryPyqs({ query, year, encodedMemberId, encodedPassword }) {
   const cleanQuery = normalizeText(query);
+  const cleanYear = normalizeText(year);
   if (!cleanQuery) {
     throw new Error("Search query is required");
   }
@@ -493,39 +595,100 @@ export async function searchLibraryPyqs({ query, encodedMemberId, encodedPasswor
 
   const payload = buildSearchPayload({
     query: cleanQuery,
+    year: cleanYear,
     viewState,
     eventValidation,
     viewStateGenerator
   });
 
-  const searchResponse = await fetch(SEARCH_URL, {
-    method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "X-Requested-With": "XMLHttpRequest",
-      "X-MicrosoftAjax": "Delta=true"
-    },
-    body: payload.toString()
-  });
-
-  const responseText = await searchResponse.text();
+  const responseText = await sendLibrarySearchRequest(payload);
   const parsed = parseSearchResults(responseText, cleanQuery);
   const deltaFields = extractAspNetFieldsFromDelta(responseText);
   const cookie = await getLibraryAuthCookie();
+  const nextFields = {
+    viewState: deltaFields.viewState || viewState,
+    eventValidation: deltaFields.eventValidation || eventValidation,
+    viewStateGenerator: deltaFields.viewStateGenerator || viewStateGenerator
+  };
 
   await saveLibraryAuth({
     isAuthenticated: true,
     cookieName: ".ASPXFORMSAUTH",
     cookieValue: cookie?.value || auth.cookieValue || "",
-    viewState: deltaFields.viewState || viewState,
-    eventValidation: deltaFields.eventValidation || eventValidation,
-    viewStateGenerator: deltaFields.viewStateGenerator || viewStateGenerator,
+    viewState: nextFields.viewState,
+    eventValidation: nextFields.eventValidation,
+    viewStateGenerator: nextFields.viewStateGenerator,
     lastQuery: cleanQuery,
     totalResults: parsed.totalResults
   });
 
-  return parsed;
+  return buildPaginatedSearchResponse({
+    query: cleanQuery,
+    parsed,
+    fields: nextFields,
+    pageIndex: 1,
+    loadedCount: 0
+  });
+}
+
+export async function loadMoreLibraryPyqs({
+  query,
+  year,
+  cursor,
+  loadedCount = 0,
+  encodedMemberId,
+  encodedPassword
+}) {
+  const cleanQuery = normalizeText(query || cursor?.query);
+  const cleanYear = normalizeText(year);
+  if (!cleanQuery) {
+    throw new Error("Search query is required");
+  }
+
+  if (!cursor?.viewState || !cursor?.eventValidation) {
+    throw new Error("No next page is available for this search");
+  }
+
+  const auth = await ensureLibrarySession(encodedMemberId, encodedPassword);
+  const payload = buildPaginationPayload({
+    query: cleanQuery,
+    year: cleanYear,
+    viewState: cursor.viewState,
+    eventValidation: cursor.eventValidation,
+    viewStateGenerator: cursor.viewStateGenerator,
+    direction: "next"
+  });
+
+  const responseText = await sendLibrarySearchRequest(payload);
+  const parsed = parseSearchResults(responseText, cleanQuery);
+  const deltaFields = extractAspNetFieldsFromDelta(responseText);
+  const cookie = await getLibraryAuthCookie();
+  const nextFields = {
+    viewState: deltaFields.viewState || cursor.viewState,
+    eventValidation: deltaFields.eventValidation || cursor.eventValidation,
+    viewStateGenerator: deltaFields.viewStateGenerator || cursor.viewStateGenerator
+  };
+  const nextPageIndex = (cursor.pageIndex || 1) + 1;
+
+  await saveLibraryAuth({
+    isAuthenticated: true,
+    cookieName: ".ASPXFORMSAUTH",
+    cookieValue: cookie?.value || auth.cookieValue || "",
+    viewState: nextFields.viewState,
+    eventValidation: nextFields.eventValidation,
+    viewStateGenerator: nextFields.viewStateGenerator,
+    lastQuery: cleanQuery,
+    totalResults: parsed.totalResults
+  });
+
+  return buildPaginatedSearchResponse({
+    query: cleanQuery,
+    parsed,
+    fields: nextFields,
+    pageIndex: nextPageIndex,
+    loadedCount,
+    pageSize: cursor.pageSize || parsed.results.length
+  });
 }
 
 export async function downloadLibraryPyq({
