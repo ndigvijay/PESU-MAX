@@ -37,6 +37,17 @@ export const searchCoursePyqs = ({ query, encodedMemberId, encodedPassword }) =>
   });
 };
 
+export const loadMoreCoursePyqs = ({ query, cursor, loadedCount, encodedMemberId, encodedPassword }) => {
+  return sendRuntimeMessage({
+    action: "loadMoreLibraryPyqs",
+    query,
+    cursor,
+    loadedCount,
+    encodedMemberId,
+    encodedPassword
+  });
+};
+
 export const downloadCoursePyq = ({
   downloadPath,
   title,

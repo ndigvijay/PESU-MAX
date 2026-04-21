@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   Alert,
   Box,
@@ -24,6 +24,7 @@ import {
   downloadPyq,
   downloadSelectedPyqsZip,
   initLibraryAuth,
+  loadMorePyqs,
   loadPyqCatalog,
   resetPyqState,
   searchPyqs,
@@ -47,11 +48,27 @@ const rowCardSx = {
   marginBottom: "10px"
 };
 
+const blueAlertSx = {
+  marginBottom: "10px",
+  fontSize: "12px",
+  backgroundColor: theme.colors.secondaryLight,
+  color: theme.colors.secondary,
+  border: "1px solid rgba(35, 58, 118, 0.18)",
+  "& .MuiAlert-icon": {
+    color: theme.colors.secondary
+  },
+  "& .MuiAlert-message": {
+    color: theme.colors.secondary
+  }
+};
+
 const loadingText = "fetching resources from library";
 const authLoadingText = "fetching resources from library\nplease wait a few seconds";
 
 const PYQ = () => {
   const dispatch = useDispatch();
+  const scrollContainerRef = useRef(null);
+  const loadMoreSentinelRef = useRef(null);
   const {
     semesters,
     courses,
@@ -65,12 +82,16 @@ const PYQ = () => {
     searchResults,
     totalResults,
     lastQuery,
+    hasMore,
+    nextPageCursor,
     catalogLoading,
     authLoading,
     authError,
     error,
     searchLoading,
     searchError,
+    loadingMore,
+    loadMoreError,
     downloadingItemId,
     bulkDownloading,
     downloadSuccessItemId,
@@ -83,6 +104,48 @@ const PYQ = () => {
     dispatch(loadPyqCatalog());
     dispatch(initLibraryAuth());
   }, [dispatch]);
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+
+    if (
+      !scrollContainer
+      || !sentinel
+      || currentStep !== "results"
+      || !hasMore
+      || !nextPageCursor
+      || searchLoading
+      || bulkDownloading
+      || loadingMore
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          dispatch(loadMorePyqs());
+        }
+      },
+      {
+        root: scrollContainer,
+        rootMargin: "160px 0px"
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    bulkDownloading,
+    currentStep,
+    dispatch,
+    hasMore,
+    loadingMore,
+    nextPageCursor,
+    searchLoading,
+    searchResults.length
+  ]);
 
   const filteredSemesters = useMemo(() => {
     if (semesterFilter === "all") {
@@ -217,6 +280,14 @@ const PYQ = () => {
     );
   };
 
+  const handleLoadMore = () => {
+    if (searchLoading || bulkDownloading || loadingMore || !hasMore || !nextPageCursor) {
+      return;
+    }
+
+    dispatch(loadMorePyqs());
+  };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <Box
@@ -296,7 +367,7 @@ const PYQ = () => {
                 </Select>
               </FormControl>
 
-              <Box sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
+              <Box ref={scrollContainerRef} sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
                 {filteredSemesters.map((semester) => (
                   <Paper
                     key={semester.value}
@@ -343,7 +414,7 @@ const PYQ = () => {
                 sx={{ marginBottom: "12px" }}
               />
 
-              <Box sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
+              <Box ref={scrollContainerRef} sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
                 {semesterCourses.map((course) => (
                   <Paper
                     key={course.id}
@@ -434,13 +505,13 @@ const PYQ = () => {
               )}
 
               {downloadSuccessItemId && (
-                <Alert severity="success" sx={{ marginBottom: "10px", fontSize: "12px" }}>
+                <Alert severity="info" sx={blueAlertSx}>
                   Download started successfully.
                 </Alert>
               )}
 
               {bulkDownloadResult && (
-                <Alert severity="success" sx={{ marginBottom: "10px", fontSize: "12px" }}>
+                <Alert severity="info" sx={blueAlertSx}>
                   ZIP download started for {bulkDownloadResult.stats?.successful || 0} PYQs.
                   {(bulkDownloadResult.stats?.failed || 0) > 0
                     ? ` ${bulkDownloadResult.stats.failed} item(s) could not be added.`
@@ -474,7 +545,7 @@ const PYQ = () => {
                 </Typography>
               )}
 
-              <Box sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
+              <Box ref={scrollContainerRef} sx={{ flex: 1, overflowY: "auto", paddingBottom: "8px" }}>
                 {!searchLoading && !bulkDownloading && searchResults.length > 0 && (
                   <Paper
                     elevation={0}
@@ -631,6 +702,53 @@ const PYQ = () => {
                   <Typography sx={{ fontSize: "13px", color: "#777", textAlign: "center", marginTop: "20px" }}>
                     No PYQs found for this search.
                   </Typography>
+                )}
+
+                {loadMoreError && (
+                  <Alert severity="error" sx={{ marginTop: "10px", fontSize: "12px" }}>
+                    {loadMoreError}
+                  </Alert>
+                )}
+
+                {(hasMore || loadingMore) && searchResults.length > 0 && (
+                  <Box
+                    ref={loadMoreSentinelRef}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      padding: "12px 0 18px"
+                    }}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <CircularProgress size={20} sx={{ color: theme.colors.primary }} />
+                        <Typography sx={{ fontSize: "11px", color: theme.colors.secondary }}>
+                          Loading more PYQs...
+                        </Typography>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={handleLoadMore}
+                        sx={{
+                          textTransform: "none",
+                          color: theme.colors.secondary,
+                          borderColor: "rgba(35, 58, 118, 0.24)",
+                          backgroundColor: "rgba(255, 255, 255, 0.85)",
+                          "&:hover": {
+                            borderColor: theme.colors.secondary,
+                            backgroundColor: theme.colors.secondaryLight
+                          }
+                        }}
+                      >
+                        Load more
+                      </Button>
+                    )}
+                  </Box>
                 )}
               </Box>
             </Box>

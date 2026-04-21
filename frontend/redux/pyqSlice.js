@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import {
   fetchPyqCatalog,
   initializeLibraryLogin,
+  loadMoreCoursePyqs,
   searchCoursePyqs,
   downloadCoursePyq,
   downloadSelectedCoursePyqsZip
@@ -42,6 +43,29 @@ export const searchPyqs = createAsyncThunk(
     try {
       return await searchCoursePyqs({
         query,
+        encodedMemberId: LIBRARY_MEMBER_ID_BASE64,
+        encodedPassword: LIBRARY_PASSWORD_BASE64
+      });
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const loadMorePyqs = createAsyncThunk(
+  "pyq/loadMorePyqs",
+  async (_, { getState, rejectWithValue }) => {
+    const { pyq } = getState();
+
+    if (!pyq?.hasMore || !pyq?.nextPageCursor) {
+      return rejectWithValue("No more PYQs to load");
+    }
+
+    try {
+      return await loadMoreCoursePyqs({
+        query: pyq.lastQuery,
+        cursor: pyq.nextPageCursor,
+        loadedCount: pyq.searchResults.length,
         encodedMemberId: LIBRARY_MEMBER_ID_BASE64,
         encodedPassword: LIBRARY_PASSWORD_BASE64
       });
@@ -97,10 +121,13 @@ const initialState = {
   searchResults: [],
   totalResults: 0,
   lastQuery: "",
+  hasMore: false,
+  nextPageCursor: null,
   catalogLoading: false,
   authLoading: false,
   authReady: false,
   searchLoading: false,
+  loadingMore: false,
   downloadingItemId: null,
   bulkDownloading: false,
   downloadSuccessItemId: null,
@@ -108,9 +135,29 @@ const initialState = {
   error: null,
   authError: null,
   searchError: null,
+  loadMoreError: null,
   downloadError: null,
   bulkDownloadError: null
 };
+
+function mergeUniquePyqResults(existingResults = [], incomingResults = []) {
+  const mergedResults = [...existingResults];
+  const seenKeys = new Set(
+    existingResults.map((item) => item.downloadPath || item.recordId || item.id)
+  );
+
+  incomingResults.forEach((item) => {
+    const resultKey = item.downloadPath || item.recordId || item.id;
+    if (seenKeys.has(resultKey)) {
+      return;
+    }
+
+    seenKeys.add(resultKey);
+    mergedResults.push(item);
+  });
+
+  return mergedResults;
+}
 
 const pyqSlice = createSlice({
   name: "pyq",
@@ -130,8 +177,11 @@ const pyqSlice = createSlice({
       state.searchResults = [];
       state.totalResults = 0;
       state.lastQuery = "";
+      state.hasMore = false;
+      state.nextPageCursor = null;
       state.searchQuery = "";
       state.searchError = null;
+      state.loadMoreError = null;
     },
     setSelectedCourse: (state, action) => {
       state.selectedCourse = action.payload;
@@ -140,7 +190,10 @@ const pyqSlice = createSlice({
       state.searchResults = [];
       state.totalResults = 0;
       state.lastQuery = "";
+      state.hasMore = false;
+      state.nextPageCursor = null;
       state.searchError = null;
+      state.loadMoreError = null;
       state.downloadSuccessItemId = null;
       state.downloadError = null;
       state.bulkDownloadResult = null;
@@ -152,6 +205,7 @@ const pyqSlice = createSlice({
     setSearchQuery: (state, action) => {
       state.searchQuery = action.payload;
       state.searchError = null;
+      state.loadMoreError = null;
       state.downloadSuccessItemId = null;
     },
     togglePyqSelection: (state, action) => {
@@ -212,6 +266,10 @@ const pyqSlice = createSlice({
         state.searchLoading = true;
         state.selectedPyqs = {};
         state.searchError = null;
+        state.loadMoreError = null;
+        state.hasMore = false;
+        state.nextPageCursor = null;
+        state.loadingMore = false;
         state.downloadSuccessItemId = null;
         state.bulkDownloadResult = null;
         state.bulkDownloadError = null;
@@ -222,6 +280,10 @@ const pyqSlice = createSlice({
         state.searchResults = action.payload?.results || [];
         state.totalResults = action.payload?.totalResults || 0;
         state.lastQuery = action.payload?.query || "";
+        state.hasMore = Boolean(action.payload?.hasMore);
+        state.nextPageCursor = action.payload?.nextCursor || null;
+        state.loadingMore = false;
+        state.loadMoreError = null;
       })
       .addCase(searchPyqs.rejected, (state, action) => {
         state.searchLoading = false;
@@ -229,7 +291,34 @@ const pyqSlice = createSlice({
         state.searchResults = [];
         state.totalResults = 0;
         state.lastQuery = "";
+        state.hasMore = false;
+        state.nextPageCursor = null;
+        state.loadingMore = false;
+        state.loadMoreError = null;
         state.searchError = action.payload;
+      })
+      .addCase(loadMorePyqs.pending, (state) => {
+        state.loadingMore = true;
+        state.loadMoreError = null;
+      })
+      .addCase(loadMorePyqs.fulfilled, (state, action) => {
+        const previousLength = state.searchResults.length;
+        const mergedResults = mergeUniquePyqResults(state.searchResults, action.payload?.results || []);
+
+        state.loadingMore = false;
+        state.searchResults = mergedResults;
+        state.totalResults = action.payload?.totalResults || state.totalResults;
+        state.lastQuery = action.payload?.query || state.lastQuery;
+        state.nextPageCursor = action.payload?.nextCursor || null;
+        state.hasMore = Boolean(
+          action.payload?.hasMore
+          && mergedResults.length > previousLength
+          && mergedResults.length < state.totalResults
+        );
+      })
+      .addCase(loadMorePyqs.rejected, (state, action) => {
+        state.loadingMore = false;
+        state.loadMoreError = action.payload;
       })
       .addCase(downloadPyq.pending, (state, action) => {
         state.downloadingItemId = action.meta.arg?.itemId || null;
