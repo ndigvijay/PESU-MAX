@@ -45,6 +45,7 @@ Use the `dist/` folder to load the extension.
 - SGPA calculator
 - CGPA calculator
 - Faculty Information
+- Previous Year Question Papers (PYQs)
 
 ## Screenshots
 
@@ -67,3 +68,8 @@ Use the `dist/` folder to load the extension.
 | Menu | Profile |
 |:----:|:-------:|
 | ![Faculty Menu](Images/faculty-menu.png) | ![Faculty Profile](Images/faculty-profile.png) |
+
+### PYQs
+| PYQ Downloader |
+|:--------------:|
+| ![PYQs](Images/PYQs.png) |
