@@ -23,7 +23,6 @@ import {
   clearDownloadFeedback,
   downloadPyq,
   downloadSelectedPyqsZip,
-  initLibraryAuth,
   loadMorePyqs,
   loadPyqCatalog,
   resetPyqState,
@@ -64,7 +63,6 @@ const blueAlertSx = {
 };
 
 const loadingText = "fetching resources from library";
-const authLoadingText = "fetching resources from library\nplease wait a few seconds";
 const DEFAULT_PYQ_YEAR = String(new Date().getFullYear());
 const PYQ_YEAR_OPTIONS = Array.from({ length: 5 }, (_, index) => String(new Date().getFullYear() - index));
 
@@ -89,8 +87,6 @@ const PYQ = () => {
     hasMore,
     nextPageCursor,
     catalogLoading,
-    authLoading,
-    authError,
     error,
     searchLoading,
     searchError,
@@ -106,7 +102,6 @@ const PYQ = () => {
 
   useEffect(() => {
     dispatch(loadPyqCatalog());
-    dispatch(initLibraryAuth());
   }, [dispatch]);
 
   useEffect(() => {
@@ -323,7 +318,7 @@ const PYQ = () => {
         </Typography>
       </Box>
 
-      {(catalogLoading || authLoading) && (
+      {catalogLoading && (
         <Box
           sx={{
             display: "flex",
@@ -344,19 +339,13 @@ const PYQ = () => {
               whiteSpace: "pre-line"
             }}
           >
-            {authLoading ? authLoadingText : loadingText}
+            {loadingText}
           </Typography>
         </Box>
       )}
 
-      {!catalogLoading && !authLoading && (
+      {!catalogLoading && (
         <>
-          {authError && (
-            <Alert severity="warning" sx={{ marginBottom: "10px", fontSize: "12px" }}>
-              Library login issue: {authError}
-            </Alert>
-          )}
-
           {error && (
             <Alert severity="error" sx={{ marginBottom: "10px", fontSize: "12px" }}>
               {error}

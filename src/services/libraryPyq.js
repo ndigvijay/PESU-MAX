@@ -572,7 +572,7 @@ export async function getPyqCourseCatalog() {
 }
 
 export async function loginLibraryWithCredentials({ encodedMemberId, encodedPassword }) {
-  return loginToLibrary(encodedMemberId, encodedPassword);
+  return ensureLibrarySession(encodedMemberId, encodedPassword);
 }
 
 export async function searchLibraryPyqs({ query, year, encodedMemberId, encodedPassword }) {
