@@ -85,6 +85,18 @@ const DownloadProgressDialog = ({ open, onClose }) => {
             >
               {downloadProgress.currentItem}
             </Typography>
+            {downloadProgress.status === 'merging' && (
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 0.5,
+                  color: '#888',
+                  fontSize: '11px'
+                }}
+              >
+                Converting PPTX/DOCS to PDF might take some time, please wait.
+              </Typography>
+            )}
           </Box>
         )}
 
