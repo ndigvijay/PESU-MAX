@@ -123,6 +123,72 @@ function hasPdfSignature(header) {
   return false;
 }
 
+function hasOleSignature(header) {
+  return header.length >= 8
+    && header[0] === 0xd0
+    && header[1] === 0xcf
+    && header[2] === 0x11
+    && header[3] === 0xe0
+    && header[4] === 0xa1
+    && header[5] === 0xb1
+    && header[6] === 0x1a
+    && header[7] === 0xe1;
+}
+
+function containsAsciiBytes(bytes, text) {
+  const pattern = Array.from(text, (character) => character.charCodeAt(0));
+
+  for (let index = 0; index <= bytes.length - pattern.length; index++) {
+    let matched = true;
+
+    for (let patternIndex = 0; patternIndex < pattern.length; patternIndex++) {
+      if (bytes[index + patternIndex] !== pattern[patternIndex]) {
+        matched = false;
+        break;
+      }
+    }
+
+    if (matched) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function containsUtf16LeBytes(bytes, text) {
+  const pattern = [];
+  for (const character of text) {
+    pattern.push(character.charCodeAt(0), 0x00);
+  }
+
+  for (let index = 0; index <= bytes.length - pattern.length; index++) {
+    let matched = true;
+
+    for (let patternIndex = 0; patternIndex < pattern.length; patternIndex++) {
+      if (bytes[index + patternIndex] !== pattern[patternIndex]) {
+        matched = false;
+        break;
+      }
+    }
+
+    if (matched) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isWordDocFile(bytes) {
+  if (!hasOleSignature(bytes)) {
+    return false;
+  }
+
+  return containsUtf16LeBytes(bytes, 'WordDocument')
+    || containsAsciiBytes(bytes, 'Microsoft Office Word');
+}
+
 async function inspectBlobFileType(blob, reportedExtension = '') {
   const normalizedReportedExtension = normalizeExtension(reportedExtension);
 
@@ -177,6 +243,17 @@ async function inspectBlobFileType(blob, reportedExtension = '') {
         return {
           isPdf: false,
           resolvedExtension: normalizedReportedExtension
+        };
+      }
+    }
+
+    if (hasOleSignature(header)) {
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+
+      if (isWordDocFile(bytes)) {
+        return {
+          isPdf: false,
+          resolvedExtension: '.doc'
         };
       }
     }

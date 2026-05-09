@@ -27,6 +27,10 @@ const OFFICE_CONVERSION_CONFIG = {
   }
 };
 
+const OFFICE_MIME_TYPES = {
+  ".doc": "application/msword"
+};
+
 export function isOfficeConvertibleExtension(extension) {
   const normalized = normalizeExtension(extension);
   return Boolean(OFFICE_CONVERSION_CONFIG[normalized]);
@@ -53,7 +57,7 @@ export async function convertOfficeBlobToPdfWithILovePdf({ blob, filename, exten
     workerServer,
     token: taskConfig.token,
     taskId: taskConfig.taskId,
-    blob,
+    blob: officeBlobWithCorrectType(blob, normalizedExtension),
     filename: resolvedFilename
   });
 
@@ -248,6 +252,16 @@ function normalizeExtension(extension) {
 
   const trimmed = extension.trim().toLowerCase();
   return trimmed.startsWith(".") ? trimmed : `.${trimmed}`;
+}
+
+function officeBlobWithCorrectType(blob, extension) {
+  const mimeType = OFFICE_MIME_TYPES[normalizeExtension(extension)];
+
+  if (!mimeType || blob.type === mimeType) {
+    return blob;
+  }
+
+  return new Blob([blob], { type: mimeType });
 }
 
 function getFileExtension(filename) {
