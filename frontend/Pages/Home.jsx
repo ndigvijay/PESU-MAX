@@ -109,14 +109,17 @@ const Home = () => {
           </Button>)}
           {isLoggedIn && (<Button
             variant="contained"
+            disabled
             sx={{
               backgroundColor: theme.colors.secondary,
               width: '100%',
               textAlign: 'center',
-              padding: '12px'
-            }}
-            onClick={() => {
-              dispatch(setCurrentPage("pyq"));
+              padding: '12px',
+              '&.Mui-disabled': {
+                backgroundColor: theme.colors.secondary,
+                color: '#fff',
+                opacity: 0.45
+              }
             }}
           >
             Download PYQs
