@@ -13,6 +13,8 @@ module.exports = (env, argv) => {
     entry: {
       background: path.resolve(__dirname, 'src/background/background.js'),
       content: path.resolve(__dirname, 'src/content/contentScript.jsx'),
+      navigationBridge: path.resolve(__dirname, 'src/content/navigationBridge.js'),
+      navigationObserver: path.resolve(__dirname, 'src/content/navigationObserver.js'),
       popup: path.resolve(__dirname, 'src/popup/popup.jsx'),
       options: path.resolve(__dirname, 'src/options/Options.jsx')
     },

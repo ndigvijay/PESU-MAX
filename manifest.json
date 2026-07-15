@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PESU-MAX",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "action": {
     "default_popup": "src/popup/index.html"
   },
@@ -19,6 +19,17 @@
     "https://*.ilovepdf.com/*"
   ],
   "content_scripts": [
+    {
+      "matches": ["https://www.pesuacademy.com/Academy/*"],
+      "js": ["navigationObserver/navigationObserver.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://www.pesuacademy.com/Academy/*"],
+      "js": ["navigationBridge/navigationBridge.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": ["https://www.pesuacademy.com/*"],
       "js": ["content/content.js"]
