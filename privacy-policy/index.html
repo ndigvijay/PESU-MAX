@@ -68,6 +68,12 @@
         <strong>Faculty data</strong>: publicly available faculty profile
         details from <code>staff.pes.edu</code>
       </li>
+      <li>
+        <strong>Navigation metadata</strong>: per-tab PESU Academy navigation
+        interactions, such as selected portal sections and semester/course
+        identifiers, used only to restore the prior view when the browser Back
+        button is pressed
+      </li>
     </ul>
 
     <h2>3) How Data Is Collected</h2>
@@ -88,7 +94,11 @@
 
     <p>
       PESU-MAX stores extension data in <code>chrome.storage.local</code> on
-      the user device.
+      the user device. The Back-navigation feature stores its per-tab
+      navigation metadata in <code>chrome.storage.session</code>, which is
+      cleared when the browser session ends. Navigation metadata does not
+      include credentials, cookies, CSRF tokens, request bodies, or page
+      content.
     </p>
 
     <p>PESU-MAX does not operate its own external database for user data.</p>
@@ -162,6 +172,12 @@
       <li>the user clears extension data, or</li>
       <li>the extension is uninstalled.</li>
     </ul>
+
+    <p>
+      Back-navigation metadata is retained only for the active browser session,
+      is limited to a recent per-tab history, and is cleared when the tab is
+      closed or the user explicitly logs out.
+    </p>
 
     <h2>9) Data Sharing, Sale, and Advertising</h2>
 

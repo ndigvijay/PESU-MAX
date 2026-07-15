@@ -26,6 +26,7 @@ Depending on feature usage, PESU-MAX may process:
 - **Download metadata**: selected subject/class/content type, merge choices, generated ZIP filename/time, selected PYQ titles, and PYQ ZIP filename/time
 - **Search/query data**: faculty search queries and PYQ search queries such as course codes or custom titles
 - **Faculty data**: publicly available faculty profile details from `staff.pes.edu`
+- **Navigation metadata**: per-tab PESU Academy navigation interactions, such as selected portal sections and semester/course identifiers, used only to restore the prior view when the browser Back button is pressed
 
 ## 3) How Data Is Collected
 
@@ -38,7 +39,7 @@ Data is collected from:
 
 ## 4) Where Data Is Stored
 
-PESU-MAX stores extension data in `chrome.storage.local` on the user device.
+PESU-MAX stores extension data in `chrome.storage.local` on the user device. The Back-navigation feature stores its per-tab navigation metadata in `chrome.storage.session`, which is cleared when the browser session ends. Navigation metadata does not include credentials, cookies, CSRF tokens, request bodies, or page content.
 
 PESU-MAX does not operate its own external database for user data.
 
@@ -80,6 +81,8 @@ Data stored by the extension remains on-device until:
 - it is refreshed/overwritten by normal extension operation,
 - the user clears extension data, or
 - the extension is uninstalled.
+
+Back-navigation metadata is retained only for the active browser session, is limited to a recent per-tab history, and is cleared when the tab is closed or the user explicitly logs out.
 
 ## 9) Data Sharing, Sale, and Advertising
 
