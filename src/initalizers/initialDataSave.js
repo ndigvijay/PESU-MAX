@@ -83,7 +83,7 @@ export async function fetchAllPESUData() {
 
     const unitsWithClasses = await parallelBatch(allUnits, async ({ subjectId, unit }) => {
       try {
-        const classesData = await getUnitClasses(unit.id);
+        const classesData = await getUnitClasses(subjectId, unit.id);
         const classes = classesData ? parseUnitClasses(classesData) : [];
         return { subjectId, unit: { ...unit, classes } };
       } catch (err) {

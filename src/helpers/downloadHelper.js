@@ -404,9 +404,9 @@ async function downloadSingleFile(url) {
 }
 
 // Get file content from a class material
-async function getClassMaterialFile(subjectId, classId, contentType = 2) {
+async function getClassMaterialFile(subjectId, unitId, classId, classNo, contentType = 2) {
   try {
-    const result = await getCourseMaterials(subjectId, classId, contentType);
+    const result = await getCourseMaterials(subjectId, unitId, classId, classNo, contentType);
 
     if (!result) {
       return [{ success: false, error: 'No response from server' }];
@@ -503,11 +503,11 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
   const results = await parallelBatch(downloadTasks, async (task) => {
     const { item, contentType } = task;
-    const { subjectId, classId, className } = item;
+    const { subjectId, unitId, classId, classNo, className } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'Unknown';
 
     try {
-      const filesArray = await getClassMaterialFile(subjectId, classId, contentType);
+      const filesArray = await getClassMaterialFile(subjectId, unitId, classId, classNo, contentType);
       completed++;
       if (progressCallback) {
         progressCallback({
@@ -842,6 +842,7 @@ export function getSelectedClassesInfo(selectedClasses, pesuData) {
             unitName: unit.name,
             unitNumber: unitIndex + 1,
             classId: cls.id,
+            classNo: cls.classNo || String(classIndexInUnit),
             className: cls.className,
             classIndex: classIndexInUnit
           });

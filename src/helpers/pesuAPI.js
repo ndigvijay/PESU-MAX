@@ -90,21 +90,71 @@ export const getSubjectsCode = async () => {
 };
 
 export const getCourseUnits = async (courseId) => {
-    const response = await fetch(`${BASE_URL}/a/i/getCourse/${courseId}`,{
+    const csrfToken = await getCsrfToken();
+    const params = new URLSearchParams({
+      controllerMode: "6403",
+      actionType: "42",
+      id: String(courseId),
+      menuId: "653",
+      _: String(Date.now())
+    });
+
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest"
+    };
+
+    if (csrfToken) {
+      headers["X-CSRF-TOKEN"] = csrfToken;
+    }
+
+    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
       method: "GET",
       credentials: "include",
+      headers
     });
-    const data = await response.json();
-    return data && data.trim() ? data : null;
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch course units: ${response.status}`);
+    }
+
+    const data = await response.text();
+    return data.trim() ? data : null;
 };
 
-export const getUnitClasses = async (unitId) => {
-    const response = await fetch(`${BASE_URL}/a/i/getCourseClasses/${unitId}`,{
+export const getUnitClasses = async (courseId, unitId) => {
+    const csrfToken = await getCsrfToken();
+    const params = new URLSearchParams({
+      controllerMode: "6403",
+      actionType: "43",
+      coursecontentid: String(unitId),
+      menuId: "653",
+      selectedData: String(courseId),
+      subType: "2",
+      _: String(Date.now())
+    });
+
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest"
+    };
+
+    if (csrfToken) {
+      headers["X-CSRF-TOKEN"] = csrfToken;
+    }
+
+    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
       method: "GET",
       credentials: "include",
+      headers
     });
-    const data = await response.json();
-    return data && data.trim() ? data : null;
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch unit classes: ${response.status}`);
+    }
+
+    const data = await response.text();
+    return data.trim() ? data : null;
 };
 
 export const getUserProfile = async () => {
@@ -296,20 +346,62 @@ export const getSemesterGpa = async (semesterId) => {
   }
 };
 
-export const getCourseMaterials = async (courseId, classId, contentType = 2) => {
-    const params = new URLSearchParams({
-      url: "studentProfilePESUAdmin",
+export const getCourseMaterials = async (courseId, unitId, classId, classNo, contentType = 2) => {
+    const csrfToken = await getCsrfToken();
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest"
+    };
+
+    if (csrfToken) {
+      headers["X-CSRF-TOKEN"] = csrfToken;
+    }
+
+    const viewParams = new URLSearchParams({
       controllerMode: "6403",
-      actionType: "60",
-      selectedData: courseId,
-      id: String(contentType),
-      unitid: classId
+      actionType: "44",
+      courseunitid: String(classId),
+      subjectid: String(courseId),
+      coursecontentid: String(unitId),
+      classNo: String(classNo),
+      type: String(contentType),
+      menuId: "653",
+      subType: "2",
+      _: String(Date.now())
     });
 
-    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`,{
+    const viewResponse = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${viewParams.toString()}`, {
       method: "GET",
       credentials: "include",
+      headers
     });
+
+    if (!viewResponse.ok) {
+      throw new Error(`Failed to load course material view: ${viewResponse.status}`);
+    }
+
+    const params = new URLSearchParams({
+      controllerMode: "6403",
+      actionType: "60",
+      selectedData: String(courseId),
+      id: String(contentType),
+      unitid: String(classId),
+      coursecontentid: String(unitId),
+      classno: String(classNo),
+      menuId: "653",
+      subType: "2",
+      _: String(Date.now())
+    });
+
+    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch course materials: ${response.status}`);
+    }
     
     const responseContentType = response.headers.get('Content-Type') || '';
     

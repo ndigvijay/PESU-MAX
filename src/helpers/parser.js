@@ -108,20 +108,24 @@ export const parseCourseUnits = (data) => {
   const $ = load(data);
   const units = [];
   
-  $('option').each((index, element) => {
-    const unit_id = $(element).attr('value') || '';
-    const unit_name = $(element).text().trim();
-    
-    if (unit_id && unit_name) {
-      const unitNumber = unit_name.includes(':') 
-        ? unit_name.split(':')[0].trim() 
-        : unit_name;
-      
+  $('a[onclick*="handleclassUnit"]').each((index, element) => {
+    const onclick = $(element).attr('onclick') || '';
+    const match = onclick.match(/handleclassUnit\s*\(\s*['"]([^'"]+)['"]/i);
+    const unitId = cleanId(match?.[1]);
+    const unitName = $(element).text().replace(/\s+/g, ' ').trim()
+      || $(element).attr('title')?.replace(/\s+/g, ' ').trim()
+      || '';
+
+    if (unitId && unitName) {
+      const unitNumber = unitName.includes(':')
+        ? unitName.split(':')[0].trim()
+        : unitName;
+
       units.push({
-        id: cleanId(unit_id),
-        name: unit_name,
-        unit: unit_name,
-        unitNumber: unitNumber
+        id: unitId,
+        name: unitName,
+        unit: unitName,
+        unitNumber
       });
     }
   });
@@ -137,17 +141,38 @@ export const parseUnitClasses = (data) => {
   const $ = load(data);
   const classes = [];
   
-  $('option').each((index, element) => {
-    const class_id = $(element).attr('value') || '';
-    const class_name = $(element).text().trim();
-    
-    if (class_id && class_name) {
-      classes.push({
-        id: cleanId(class_id),
-        className: class_name,
-        classType: 'Lecture' 
-      });
+  $('tr[onclick*="handleclasscoursecontentunit"]').each((index, row) => {
+    const rowOnclick = $(row).attr('onclick') || '';
+    const rowMatch = rowOnclick.match(
+      /handleclasscoursecontentunit\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]([^'"]+)['"]\s*,\s*['"]?([^,'")]+)['"]?\s*,/i
+    );
+
+    if (!rowMatch) {
+      return;
     }
+
+    const className = $(row).find('.short-title').first().text().replace(/\s+/g, ' ').trim()
+      || $(row).find('td').first().text().replace(/\s+/g, ' ').trim();
+
+    const contentTypes = [];
+    $(row).find('[onclick*="handleclasscoursecontentunit"]').each((linkIndex, link) => {
+      const onclick = $(link).attr('onclick') || '';
+      const match = onclick.match(/handleclasscoursecontentunit\s*\([^,]+,[^,]+,[^,]+,[^,]+,\s*(\d+)/i);
+      const type = Number(match?.[1]);
+      if (Number.isInteger(type) && !contentTypes.includes(type)) {
+        contentTypes.push(type);
+      }
+    });
+
+    classes.push({
+      id: cleanId(rowMatch[1]),
+      courseId: cleanId(rowMatch[2]),
+      unitId: cleanId(rowMatch[3]),
+      classNo: cleanId(rowMatch[4]),
+      className,
+      classType: 'Lecture',
+      contentTypes
+    });
   });
   
   return classes;
@@ -157,45 +182,75 @@ export const parseDownloadLinks = (htmlData) => {
   const $ = load(htmlData);
   const downloadLinks = [];
 
-  $('[onclick*="downloadcoursedoc"]').each((index, element) => {
-    const onclick = $(element).attr('onclick') || '';
-    const match = onclick.match(/downloadcoursedoc\('([^']+)'/);
+  const normalizeMaterialUrl = (url) => {
+    const cleanUrl = url.split('#')[0];
+    const match = cleanUrl.match(
+      /(?:https?:\/\/[^/]+)?\/Academy\/[as]\/referenceMeterials\/(?:downloadslidecoursedoc|downloadcoursedoc)\/([^/?#]+)/i
+    );
+
     if (match) {
-      const linkText = $(element).text().trim();
-      downloadLinks.push({
-        url: `/Academy/s/referenceMeterials/downloadcoursedoc/${match[1]}`,
-        type: 'coursedoc',
-        docId: match[1],
-        name: linkText || null
-      });
+      return `/Academy/s/referenceMeterials/downloadslidecoursedoc/${match[1]}`;
     }
-  });
+
+    return cleanUrl;
+  };
+
+  const seenUrls = new Set();
+  const addDownloadLink = (url, type, element, docId = null) => {
+    const cleanUrl = normalizeMaterialUrl(url);
+    if (!cleanUrl || seenUrls.has(cleanUrl)) {
+      return;
+    }
+
+    seenUrls.add(cleanUrl);
+    downloadLinks.push({
+      url: cleanUrl,
+      type,
+      ...(docId ? { docId } : {}),
+      name: $(element).text().replace(/\s+/g, ' ').trim() || null
+    });
+  };
 
   $('[onclick*="loadIframe"]').each((index, element) => {
     const onclick = $(element).attr('onclick') || '';
-    if (onclick.includes('downloadslidecoursedoc')) {
-      const match = onclick.match(/loadIframe\('([^']+)'/);
-      if (match) {
-        const url = match[1].split('#')[0]; 
-        const linkText = $(element).text().trim();
-        downloadLinks.push({
-          url: url,
-          type: 'slidecoursedoc', 
-          name: linkText || null
-        });
-      }
+    const match = onclick.match(/loadIframe\s*\(\s*['"]([^'"]+)['"]/i);
+    if (!match) {
+      return;
     }
+
+    const url = match[1];
+    const type = url.includes('downloadslidecoursedoc')
+      ? 'slidecoursedoc'
+      : url.includes('downloadcoursedoc')
+        ? 'coursedoc'
+        : null;
+
+    if (type) {
+      const docMatch = url.match(/(?:downloadslidecoursedoc|downloadcoursedoc)\/([^#/?]+)/i);
+      addDownloadLink(url, type, element, docMatch?.[1] || null);
+    }
+  });
+
+  $('[onclick*="downloadslidecoursedoc"], [onclick*="downloadcoursedoc"]').each((index, element) => {
+    const onclick = $(element).attr('onclick') || '';
+    const match = onclick.match(/(downloadslidecoursedoc|downloadcoursedoc)\s*\(\s*['"]([^'"]+)['"]/i);
+    if (!match) {
+      return;
+    }
+
+    addDownloadLink(
+      `/Academy/s/referenceMeterials/downloadslidecoursedoc/${match[2]}`,
+      match[1] === 'downloadslidecoursedoc' ? 'slidecoursedoc' : 'coursedoc',
+      element,
+      match[2]
+    );
   });
 
   $('a[href*="referenceMeterials"], a[href*="download"]').each((index, element) => {
     const href = $(element).attr('href') || '';
     if (href.includes('downloadslidecoursedoc') || href.includes('downloadcoursedoc')) {
       const linkText = $(element).text().trim();
-      downloadLinks.push({
-        url: href.split('#')[0], 
-        type: 'direct',
-        name: linkText || null
-      });
+      addDownloadLink(href, 'direct', element);
     }
   });
 
