@@ -22,16 +22,29 @@ export const CONTENT_TYPE_NAMES = {
 };
 
 export const getAllSemesters = async () => {
+  const csrfToken = await getCsrfToken();
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Requested-With": "XMLHttpRequest"
+  };
+
+  if (csrfToken) {
+    headers["X-CSRF-TOKEN"] = csrfToken;
+  }
+
   const response = await fetch(
-    `${BASE_URL}/a/studentProfilePESU/getStudentSemestersPESU`,
+    `${BASE_URL}/s/studentProfile/getStudentSemestersPESU?_=${Date.now()}`,
     {
       method: "GET",
       credentials: "include",
-      headers: {
-        "X-Requested-With": "XMLHttpRequest"
-      }
+      headers
     }
   );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch semesters: ${response.status}`);
+  }
+
   const data = await response.json();
   return data;
 }
