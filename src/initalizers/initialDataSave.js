@@ -27,6 +27,7 @@ export async function saveUserProfileData() {
 
 export async function fetchAllPESUData() {
   try {
+    const existingPESUData = await load("pesuData");
     let semesters = await load("semestersData");
     if (!semesters?.length) {
       await fetchSemesters();
@@ -83,7 +84,7 @@ export async function fetchAllPESUData() {
 
     const unitsWithClasses = await parallelBatch(allUnits, async ({ subjectId, unit }) => {
       try {
-        const classesData = await getUnitClasses(unit.id);
+        const classesData = await getUnitClasses(subjectId, unit.id);
         const classes = classesData ? parseUnitClasses(classesData) : [];
         return { subjectId, unit: { ...unit, classes } };
       } catch (err) {
@@ -114,16 +115,101 @@ export async function fetchAllPESUData() {
       }
     }
 
-    save("pesuData", {
+    const mergedPESUData = mergePESUData(existingPESUData, {
       subjects: subjectsMap,
-      allSubjects: enrolledSubjects,
-      fetchedAt: Date.now()
+      allSubjects: enrolledSubjects
     });
-    console.log("PESU data fetch complete");
+
+    if (hasPESUDataChanged(existingPESUData, mergedPESUData)) {
+      await save("pesuData", {
+        ...mergedPESUData,
+        fetchedAt: Date.now()
+      });
+      console.log("PESU data fetch complete and storage updated");
+    } else {
+      console.log("PESU data fetch complete with no storage changes");
+    }
 
   } catch (err) {
     console.error("Error fetching PESU data:", err);
   }
+}
+
+function mergeItemsById(existingItems = [], incomingItems = []) {
+  const mergedItems = new Map(
+    existingItems
+      .filter((item) => item?.id != null)
+      .map((item) => [String(item.id), item])
+  );
+
+  for (const item of incomingItems) {
+    if (item?.id == null) {
+      continue;
+    }
+
+    const key = String(item.id);
+    mergedItems.set(key, {
+      ...mergedItems.get(key),
+      ...item
+    });
+  }
+
+  return Array.from(mergedItems.values());
+}
+
+function mergeUnits(existingUnits = {}, incomingUnits = {}) {
+  const mergedUnits = { ...existingUnits };
+
+  for (const unit of Object.values(incomingUnits)) {
+    if (unit?.id == null) {
+      continue;
+    }
+
+    const key = String(unit.id);
+    const existingUnit = mergedUnits[key];
+    mergedUnits[key] = {
+      ...existingUnit,
+      ...unit,
+      classes: mergeItemsById(existingUnit?.classes, unit.classes)
+    };
+  }
+
+  return mergedUnits;
+}
+
+function mergeSubjects(existingSubjects = {}, incomingSubjects = {}) {
+  const mergedSubjects = { ...existingSubjects };
+
+  for (const subject of Object.values(incomingSubjects)) {
+    if (subject?.id == null) {
+      continue;
+    }
+
+    const key = String(subject.id);
+    const existingSubject = mergedSubjects[key];
+    mergedSubjects[key] = {
+      ...existingSubject,
+      ...subject,
+      units: mergeUnits(existingSubject?.units, subject.units)
+    };
+  }
+
+  return mergedSubjects;
+}
+
+function mergePESUData(existingPESUData = {}, incomingPESUData = {}) {
+  return {
+    ...existingPESUData,
+    subjects: mergeSubjects(existingPESUData?.subjects, incomingPESUData.subjects),
+    allSubjects: mergeItemsById(existingPESUData?.allSubjects, incomingPESUData.allSubjects)
+  };
+}
+
+function hasPESUDataChanged(existingPESUData, mergedPESUData) {
+  return JSON.stringify({
+    subjects: existingPESUData?.subjects || {},
+    allSubjects: existingPESUData?.allSubjects || []
+  }) !== JSON.stringify(mergedPESUData);
 }
 
 export async function fetchSemesters() {
