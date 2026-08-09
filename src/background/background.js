@@ -15,141 +15,8 @@ import {
   searchLibraryPyqs
 } from "../services/libraryPyq.js";
 
-const NAVIGATION_STATE_PREFIX = "pesuNavigationState:";
-const MAX_NAVIGATION_ENTRIES = 50;
-const NAVIGATION_TTL_MS = 30 * 60 * 1000;
-
-function navigationStateKey(tabId) {
-  return `${NAVIGATION_STATE_PREFIX}${tabId}`;
-}
-
-async function getNavigationState(tabId) {
-  const key = navigationStateKey(tabId);
-  const stored = await chrome.storage.session.get(key);
-  return stored[key] || {
-    entries: [],
-    index: -1,
-    currentEntryId: null,
-    pendingRestore: null,
-    recoveryAttempted: false
-  };
-}
-
-async function setNavigationState(tabId, state) {
-  await chrome.storage.session.set({ [navigationStateKey(tabId)]: state });
-}
-
-async function recordNavigation(tabId, entry) {
-  const state = await getNavigationState(tabId);
-  if (entry.base) {
-    await setNavigationState(tabId, {
-      entries: [entry],
-      index: 0,
-      currentEntryId: entry.id,
-      pendingRestore: null,
-      recoveryAttempted: false
-    });
-    return;
-  }
-
-  const entries = state.entries.slice(0, state.index + 1);
-  entries.push(entry);
-
-  if (entries.length > MAX_NAVIGATION_ENTRIES) {
-    entries.splice(0, entries.length - MAX_NAVIGATION_ENTRIES);
-  }
-
-  await setNavigationState(tabId, {
-    entries,
-    index: entries.length - 1,
-    currentEntryId: entry.id,
-    pendingRestore: null,
-    recoveryAttempted: false
-  });
-}
-
-async function selectNavigationEntry(tabId, entryId) {
-  const state = await getNavigationState(tabId);
-  const index = state.entries.findIndex((entry) => entry.id === entryId);
-  if (!state.entries[index]) {
-    return null;
-  }
-
-  state.index = index;
-  state.currentEntryId = entryId;
-  state.pendingRestore = state.entries[index];
-  await setNavigationState(tabId, state);
-  return state.pendingRestore;
-}
-
-async function recoverPreviousNavigation(tabId) {
-  const state = await getNavigationState(tabId);
-  if (state.recoveryAttempted) {
-    return null;
-  }
-  const current = state.entries.find((entry) => entry.id === state.currentEntryId)
-    || state.entries[state.index];
-  const entry = state.entries.find((candidate) => candidate.id === current?.parentId);
-
-  if (!entry || Date.now() - entry.createdAt > NAVIGATION_TTL_MS) {
-    return null;
-  }
-
-  state.index = state.entries.indexOf(entry);
-  state.currentEntryId = entry.id;
-  state.pendingRestore = entry;
-  state.recoveryAttempted = true;
-  await setNavigationState(tabId, state);
-  return entry;
-}
-
-async function consumePendingNavigation(tabId) {
-  const state = await getNavigationState(tabId);
-  const entry = state.pendingRestore;
-  state.pendingRestore = null;
-  await setNavigationState(tabId, state);
-  return entry || null;
-}
-
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  const tabId = sender.tab?.id;
-
-  if (request.action === "recordNavigation" && tabId !== undefined) {
-    recordNavigation(tabId, request.entry)
-      .then(() => sendResponse({ ok: true }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "activateNavigation" && tabId !== undefined) {
-    selectNavigationEntry(tabId, request.entryId)
-      .then((entry) => sendResponse({ entry }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "recoverPreviousNavigation" && tabId !== undefined) {
-    recoverPreviousNavigation(tabId)
-      .then((entry) => sendResponse({ entry }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "consumePendingNavigation" && tabId !== undefined) {
-    consumePendingNavigation(tabId)
-      .then((entry) => sendResponse({ entry }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
-  if (request.action === "clearNavigation" && tabId !== undefined) {
-    chrome.storage.session.remove(navigationStateKey(tabId))
-      .then(() => sendResponse({ ok: true }))
-      .catch((error) => sendResponse({ error: error.message }));
-    return true;
-  }
-
   if (request.action === "getPESUData") {
     load("pesuData").then((data) => {
       sendResponse({
@@ -316,10 +183,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => sendResponse({ error: error.message }));
     return true;
   }
-});
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-  chrome.storage.session.remove(navigationStateKey(tabId));
 });
 
 // Initialize data sync with alarms
