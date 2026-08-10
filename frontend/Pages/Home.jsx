@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Typography, Button } from "@mui/material";
+import WarningIcon from '@mui/icons-material/Warning';
 import { useDispatch } from "react-redux";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
 import theme from "../Themes/theme.jsx";
@@ -124,6 +125,29 @@ const Home = () => {
           >
             Download PYQs
           </Button>)}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              gap: '6px',
+              padding: '12px 4px 0',
+              color: '#d32f2f'
+            }}
+          >
+            <WarningIcon sx={{ fontSize: '1.2rem', flexShrink: 0 }} />
+            <Typography variant="body2" sx={{ textAlign: 'center' }}>
+              Breaking Changes!!! if you had previously installed an older version(&lt;2.0.0), please reinstall the extension.{' '}
+              <a
+                href="https://chromewebstore.google.com/detail/pesu-max/cmdaofpmedkoahlmcihcdaehgenfdnen"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: theme.colors.secondaryHover, fontWeight: 600 }}
+              >
+                Install link
+              </a>
+            </Typography>
+          </Box>
         </Box>
     </Box>
    );
