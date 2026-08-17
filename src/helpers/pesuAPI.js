@@ -263,40 +263,30 @@ export const getCsrfToken = async () => {
 };
 
 export const getAttendance = async (semesterId) => {
-  // get the CSRF token
-  const csrfToken = await getCsrfToken();
-  
-  const formParams = {
-    controllerMode: "6407",
-    actionType: "8",
-    batchClassId: semesterId,
-    menuId: "660"
-  };
-  
-  if (csrfToken) {
-    formParams._csrf = csrfToken;
-  }
-  
-  const formBody = new URLSearchParams(formParams);
+    const params = new URLSearchParams({
+      controllerMode: "6407",
+      actionType: "8",
+      batchClassId: String(semesterId),
+      menuId: "660",
+      _: String(Date.now())
+    });
 
-  const headers = {
-    "Content-Type": "application/x-www-form-urlencoded",
-    "X-Requested-With": "XMLHttpRequest"
-  };
-  
-  // Add CSRF token
-  if (csrfToken) {
-    headers["X-CSRF-TOKEN"] = csrfToken;
-  }
+    const headers = {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-Requested-With": "XMLHttpRequest"
+    };
 
-  const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin`, {
-    method: "POST",
-    credentials: "include",
-    headers,
-    body: formBody.toString()
-  });
+    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+      headers
+    });
 
-  const data = await response.text();
+    if (!response.ok) {
+      throw new Error(`Failed to fetch attendance: ${response.status}`);
+    }
+
+    const data = await response.text();
   return data;
 };
 
