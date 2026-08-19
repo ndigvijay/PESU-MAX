@@ -1,4 +1,5 @@
 import { createBulkDownloadZip } from './downloadHelper.js';
+import { downloadBlob } from './browserDownload.js';
 import { CONTENT_TYPE_IDS } from './pesuAPI.js';
 
 const DEFAULT_CONTENT_TYPES = [CONTENT_TYPE_IDS.slides];
@@ -33,53 +34,46 @@ export async function handleBulkDownload(selectedItems, contentTypes, mergeOptio
     }
   };
 
-  try {
-    const result = await createBulkDownloadZip(selectedItems, progressCallback, typesToDownload, {
-      mergeOptions,
-      mergeSlides
-    });
-    
-    // Convert blob to data URL 
-    const arrayBuffer = await result.blob.arrayBuffer();
-    const base64 = btoa(
-      new Uint8Array(arrayBuffer)
-        .reduce((data, byte) => data + String.fromCharCode(byte), '')
-    );
-    const dataUrl = `data:application/zip;base64,${base64}`;
-    
-    chrome.downloads.download({
-      url: dataUrl,
-      filename: `PESU_Materials_${Date.now()}.zip`,
-      saveAs: true
-    }, (downloadId) => {
-      if (chrome.runtime.lastError) {
-        console.error("Download error:", chrome.runtime.lastError);
-        sendResponse({ 
-          error: chrome.runtime.lastError.message,
-          stats: result.stats 
-        });
-      } else {
-        sendResponse({
-          success: true,
-          downloadId: downloadId,
-          stats: result.stats
-        });
-      }
-      
-      if (port) {
-        try {
-          port.disconnect();
-        } catch (e) {}
-      }
-    });
-  } catch (error) {
-    console.error("Bulk download error:", error);
-    sendResponse({ error: error.message });
-    
+  const closePort = () => {
     if (port) {
       try {
         port.disconnect();
       } catch (e) {}
     }
+  };
+
+  let result;
+  try {
+    result = await createBulkDownloadZip(selectedItems, progressCallback, typesToDownload, {
+      mergeOptions,
+      mergeSlides
+    });
+  } catch (error) {
+    console.error("Bulk download error:", error);
+    sendResponse({ error: error.message });
+    closePort();
+    return;
+  }
+
+  try {
+    const downloadId = await downloadBlob(
+      result.blob,
+      `PESU_Materials_${Date.now()}.zip`,
+      { saveAs: true }
+    );
+
+    sendResponse({
+      success: true,
+      downloadId: downloadId,
+      stats: result.stats
+    });
+  } catch (error) {
+    console.error("Download error:", error);
+    sendResponse({
+      error: error.message,
+      stats: result.stats
+    });
+  } finally {
+    closePort();
   }
 }

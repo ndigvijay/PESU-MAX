@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import * as cheerio from "cheerio";
 import { load, save } from "../utils/storage.js";
+import { downloadBlob } from "../helpers/browserDownload.js";
 
 const LIBRARY_BASE_URL = "http://library.pes.edu";
 const LOGIN_URL = `${LIBRARY_BASE_URL}/MyPage.aspx`;
@@ -471,19 +472,6 @@ function buildPaginatedSearchResponse({ query, parsed, fields, pageIndex, loaded
   };
 }
 
-function arrayBufferToBase64(arrayBuffer) {
-  let binary = "";
-  const bytes = new Uint8Array(arrayBuffer);
-  const chunkSize = 0x8000;
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-}
-
 function ensurePdfExtension(name) {
   return name.toLowerCase().endsWith(".pdf") ? name : `${name}.pdf`;
 }
@@ -491,26 +479,6 @@ function ensurePdfExtension(name) {
 function buildZipFileName(query) {
   const safeQuery = sanitizeFilename(query || "PYQs") || "PYQs";
   return `PESU_PYQs_${safeQuery}.zip`;
-}
-
-function triggerBrowserDownload(url, filename) {
-  return new Promise((resolve, reject) => {
-    chrome.downloads.download(
-      {
-        url,
-        filename,
-        saveAs: false
-      },
-      (downloadId) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-
-        resolve(downloadId);
-      }
-    );
-  });
 }
 
 export async function getPyqCourseCatalog() {
@@ -713,17 +681,14 @@ export async function downloadLibraryPyq({
     throw new Error(`Unable to download file (HTTP ${fileResponse.status})`);
   }
 
-  const fileBlob = await fileResponse.blob();
-  const fileBuffer = await fileBlob.arrayBuffer();
-  const fileBase64 = arrayBufferToBase64(fileBuffer);
   const mimeType = (fileResponse.headers.get("Content-Type") || "application/pdf").split(";")[0];
-  const dataUrl = `data:${mimeType};base64,${fileBase64}`;
+  const fileBlob = new Blob([await fileResponse.arrayBuffer()], { type: mimeType });
 
   const fallbackName = `PYQ_${Date.now()}`;
   const safeName = sanitizeFilename(title || fallbackName) || fallbackName;
   const hasPdfExtension = safeName.toLowerCase().endsWith(".pdf");
   const fileName = hasPdfExtension ? safeName : `${safeName}.pdf`;
-  const downloadId = await triggerBrowserDownload(dataUrl, `PESU_PYQs/${fileName}`);
+  const downloadId = await downloadBlob(fileBlob, `PESU_PYQs/${fileName}`);
 
   return {
     downloadId,
@@ -795,11 +760,8 @@ export async function downloadLibraryPyqsZip({
     compression: "DEFLATE",
     compressionOptions: { level: 4 }
   });
-  const zipBuffer = await zipBlob.arrayBuffer();
-  const zipBase64 = arrayBufferToBase64(zipBuffer);
-  const zipDataUrl = `data:application/zip;base64,${zipBase64}`;
   const fileName = buildZipFileName(query);
-  const downloadId = await triggerBrowserDownload(zipDataUrl, `PESU_PYQs/${fileName}`);
+  const downloadId = await downloadBlob(zipBlob, `PESU_PYQs/${fileName}`);
 
   return {
     downloadId,

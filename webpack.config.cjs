@@ -1,13 +1,36 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 
-module.exports = (env, argv) => {
+// Firefox is the default target for this fork; `--env browser=chrome` still
+// produces the upstream Chrome MV3 build from the same sources.
+const TARGETS = {
+  firefox: {
+    outputDir: 'dist-firefox',
+    manifest: 'manifest.firefox.json',
+    babelTargets: { firefox: '128' }
+  },
+  chrome: {
+    outputDir: 'dist',
+    manifest: 'manifest.json',
+    babelTargets: { chrome: '88' }
+  }
+};
+
+module.exports = (env = {}, argv = {}) => {
   const isProduction = argv.mode === 'production';
+  const browser = env.browser || 'firefox';
+  const target = TARGETS[browser];
+
+  if (!target) {
+    throw new Error(`Unknown browser target "${browser}". Use firefox or chrome.`);
+  }
 
   return {
     mode: isProduction ? 'production' : 'development',
+    // Never an eval-based devtool: extension page CSP forbids eval in both engines.
     devtool: isProduction ? 'source-map' : 'cheap-module-source-map',
 
     entry: {
@@ -18,7 +41,7 @@ module.exports = (env, argv) => {
     },
 
     output: {
-      path: path.resolve(__dirname, 'dist'),
+      path: path.resolve(__dirname, target.outputDir),
       filename: '[name]/[name].js',
       clean: true,
       publicPath: '/'
@@ -34,7 +57,7 @@ module.exports = (env, argv) => {
           extractComments: false,
         }),
       ],
-      // CRITICAL: Disable ALL code splitting for Chrome Extension MV3
+      // CRITICAL: MV3 background scripts cannot load extra chunks at runtime.
       splitChunks: false,
       runtimeChunk: false,
     },
@@ -49,7 +72,7 @@ module.exports = (env, argv) => {
             options: {
               presets: [
                 ['@babel/preset-env', {
-                  targets: { chrome: '88' },
+                  targets: target.babelTargets,
                   modules: false
                 }],
                 ['@babel/preset-react', {
@@ -82,6 +105,9 @@ module.exports = (env, argv) => {
     },
 
     plugins: [
+      new webpack.DefinePlugin({
+        __TARGET_BROWSER__: JSON.stringify(browser)
+      }),
       new HtmlWebpackPlugin({
         template: './src/popup/index.html',
         filename: 'src/popup/index.html',
@@ -99,7 +125,7 @@ module.exports = (env, argv) => {
       new CopyPlugin({
         patterns: [
           {
-            from: 'manifest.json',
+            from: target.manifest,
             to: 'manifest.json'
           },
           {

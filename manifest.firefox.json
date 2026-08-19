@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "PESU-MAX",
+  "version": "2.0.2",
+  "description": "Bulk-download course material, attendance/GPA calculators, faculty info and PYQs for PESU Academy.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "pesu-max@dhyan.local",
+      "strict_min_version": "128.0"
+    }
+  },
+  "action": {
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "scripts": ["background/background.js"]
+  },
+  "permissions": ["cookies", "storage", "downloads", "alarms"],
+  "host_permissions": [
+    "https://www.pesuacademy.com/*",
+    "https://files.pesuacademy.com/*",
+    "https://staff.pes.edu/*",
+    "http://library.pes.edu/*",
+    "https://library.pes.edu/*",
+    "https://www.ilovepdf.com/*",
+    "https://*.ilovepdf.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.pesuacademy.com/*"],
+      "js": ["content/content.js"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/Pes_logo_square_ui.png"],
+      "matches": ["https://www.pesuacademy.com/*"]
+    }
+  ]
+}
