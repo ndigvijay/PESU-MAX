@@ -272,7 +272,7 @@ async function inspectBlobFileType(blob, reportedExtension = '') {
 
 function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, totalFilesInClass, options = {}) {
   const { subjectName, unitNumber, className, classIndex } = item;
-  const { flattenIntoContentFolder = false, extensionOverride = fileResult.extension } = options;
+  const { extensionOverride = fileResult.extension } = options;
   const safeFolderName = sanitizeFilename(subjectName);
   const contentFolder = sanitizeFilename(contentTypeName);
   const numberingPrefix = `${unitNumber}.${classIndex || 1}.${fileNumber}`;
@@ -288,11 +288,10 @@ function buildIndividualFilePath(item, contentTypeName, fileResult, fileNumber, 
 
   const safeFileName = baseFileName + extensionOverride;
 
-  if (contentFolder === 'QA' || contentFolder === 'QB' || flattenIntoContentFolder) {
-    return `${safeFolderName}/${contentFolder}/${safeFileName}`;
-  }
-
-  const unitFolder = String(unitNumber || 1);
+  // Layout: <Course>/Unit N/<Content type>/<file>
+  // QA and QB used to be hoisted out of their unit, and unit folders were bare
+  // numbers ("1/Slides"), which made the archive hard to navigate.
+  const unitFolder = `Unit ${unitNumber || 1}`;
   return `${safeFolderName}/${unitFolder}/${contentFolder}/${safeFileName}`;
 }
 
@@ -323,7 +322,9 @@ function buildMergedContentFilePath(subjectName, subjectCode, contentTypeName) {
     ? `${sanitizeFilename(subjectCode)}_Merged_${safeContentFolder}.pdf`
     : `Merged_${safeContentFolder}.pdf`;
 
-  return `${safeFolderName}/${safeContentFolder}/${mergedFileName}`;
+  // Merged PDFs span every unit of the subject, so they cannot live inside one
+  // Unit folder - they sit in their own top-level folder per course.
+  return `${safeFolderName}/Merged/${mergedFileName}`;
 }
 
 function getFilenameFromPath(filePath) {
@@ -429,6 +430,12 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
       // Parse HTML to get download links
       const downloadLinks = parseDownloadLinks(result.data);
       if (downloadLinks.length === 0) {
+        // PESU renders "No Notes Content to Display" (or QB/QA/Assignments/MCQs)
+        // when the class has nothing of that type. Distinguish that from a
+        // genuine parse failure so the UI can stay quiet about it.
+        if (/Nos+[A-Za-z]+s+Contents+tos+Display/i.test(result.data)) {
+          return [{ success: false, unavailable: true, error: 'No material of this type for this class' }];
+        }
         return [{ success: false, error: 'No download links found in HTML' }];
       }
 
@@ -493,16 +500,44 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
   const totalOperations = downloadOperations + subjectMergeGroups.size;
   let completed = 0;
 
-  // Create download tasks for each item and content type combination
+  // Create download tasks for each item and content type combination.
+  //
+  // Built content-type-major on purpose. Item-major ordering puts all five
+  // content types for ONE class next to each other, and parallelBatch runs five
+  // at a time - so every batch hammered a single class with five simultaneous
+  // requests to the stateful studentProfilePESUAdmin controller, which answers
+  // 500. Striping by content type means a batch always spans distinct classes.
+  // `order` restores the original item-major sequence below, because merge
+  // ordering (slide page order in the combined PDF) depends on it.
+  //
+  // PESU already tells us which content types a class has (parsed into
+  // availableContentTypes). Most classes only ever get slides, so asking every
+  // class for all five types produced thousands of pointless requests that came
+  // back "No Notes Content to Display" and were reported to the user as
+  // failures. Skip those up front: fewer requests, no phantom errors.
   const downloadTasks = [];
-  for (const item of selectedItems) {
-    for (const contentType of contentTypes) {
-      downloadTasks.push({ item, contentType });
+  let skipped = 0;
+  for (let typeIndex = 0; typeIndex < contentTypes.length; typeIndex++) {
+    for (let itemIndex = 0; itemIndex < selectedItems.length; itemIndex++) {
+      const item = selectedItems[itemIndex];
+      const contentType = contentTypes[typeIndex];
+      const known = item.availableContentTypes;
+
+      if (Array.isArray(known) && known.length > 0 && !known.includes(contentType)) {
+        skipped++;
+        continue;
+      }
+
+      downloadTasks.push({
+        item,
+        contentType,
+        order: itemIndex * contentTypes.length + typeIndex
+      });
     }
   }
 
-  const results = await parallelBatch(downloadTasks, async (task) => {
-    const { item, contentType } = task;
+  const unorderedResults = await parallelBatch(downloadTasks, async (task) => {
+    const { item, contentType, order } = task;
     const { subjectId, unitId, classId, classNo, className } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'Unknown';
 
@@ -517,7 +552,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           status: 'downloading'
         });
       }
-      return { item, contentType, filesArray };
+      return { item, contentType, filesArray, order };
     } catch (error) {
       completed++;
       if (progressCallback) {
@@ -528,9 +563,12 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           status: 'downloading'
         });
       }
-      return { item, contentType, filesArray: [{ success: false, error: error.message }] };
+      return { item, contentType, filesArray: [{ success: false, error: error.message }], order };
     }
   }, 5);
+
+  // Restore item-major order so downstream merge grouping is unchanged.
+  const results = unorderedResults.slice().sort((a, b) => a.order - b.order);
 
   const failedItems = [];
   let failed = 0;
@@ -543,6 +581,13 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
   for (const { item, contentType, filesArray } of results) {
     const { subjectName, subjectCode, subjectId, unitNumber, className, classId, classIndex } = item;
     const contentTypeName = CONTENT_TYPE_NAMES[contentType] || 'PESU_Material';
+
+    // The server answers "No <type> Content to Display" for combinations that
+    // simply have nothing uploaded. That is not a failure worth showing.
+    if (Array.isArray(filesArray) && filesArray.length === 1 && filesArray[0]?.unavailable) {
+      skipped++;
+      continue;
+    }
 
     if (!filesArray || !Array.isArray(filesArray) || filesArray.length === 0) {
       failed++;
@@ -590,10 +635,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           fileResult,
           fileNumber,
           filesArray.length,
-          {
-            flattenIntoContentFolder: isMergeSelectedType,
-            extensionOverride: resolvedExtension || fileResult.extension
-          }
+          { extensionOverride: resolvedExtension || fileResult.extension }
         );
         const canMergeThisFile = isMergeSelectedType;
         const isMergeablePdf = canMergeThisFile && fileInspection.isPdf;
@@ -811,6 +853,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       total: totalOperations,
       successful: totalFiles,
       failed,
+      skipped,
       failedItems,
       mergedSubjects,
       mergedSlideSources,
@@ -820,48 +863,4 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)
     }
   };
-}
-
-// Extract selected class details from selection state and pesu data
-export function getSelectedClassesInfo(selectedClasses, pesuData) {
-  const selectedItems = [];
-  
-  if (!pesuData?.items) return selectedItems;
-  
-  for (const subject of pesuData.items) {
-    (subject.units || []).forEach((unit, unitIndex) => {
-      let classIndexInUnit = 0;
-      for (const cls of (unit.classes || [])) {
-        if (selectedClasses[cls.id]) {
-          classIndexInUnit++;
-          selectedItems.push({
-            subjectId: subject.id,
-            subjectCode: subject.subjectCode,
-            subjectName: subject.subjectName,
-            unitId: unit.id,
-            unitName: unit.name,
-            unitNumber: unitIndex + 1,
-            classId: cls.id,
-            classNo: cls.classNo || String(classIndexInUnit),
-            className: cls.className,
-            classIndex: classIndexInUnit
-          });
-        }
-      }
-    });
-  }
-  
-  return selectedItems;
-}
-
-// Trigger browser download of a blob
-export function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }

@@ -336,6 +336,36 @@ export const getSemesterGpa = async (semesterId) => {
   }
 };
 
+// studentProfilePESUAdmin is a stateful controller and intermittently answers 5xx
+// when a session drives it hard (bulk downloads issue ~1400 requests). A short
+// backoff clears it; without this a single blip fails the whole item permanently.
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+async function fetchWithRetry(url, options, { attempts = 4, baseDelayMs = 700 } = {}) {
+  let lastResponse = null;
+  let lastError = null;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      const backoff = baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 250;
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
+
+    try {
+      const response = await fetch(url, options);
+      if (response.ok || !RETRYABLE_STATUSES.has(response.status)) {
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError;
+}
+
 export const getCourseMaterials = async (courseId, unitId, classId, classNo, contentType = 2) => {
     const csrfToken = await getCsrfToken();
     const headers = {
@@ -360,7 +390,7 @@ export const getCourseMaterials = async (courseId, unitId, classId, classNo, con
       _: String(Date.now())
     });
 
-    const viewResponse = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${viewParams.toString()}`, {
+    const viewResponse = await fetchWithRetry(`${BASE_URL}/s/studentProfilePESUAdmin?${viewParams.toString()}`, {
       method: "GET",
       credentials: "include",
       headers
@@ -383,7 +413,7 @@ export const getCourseMaterials = async (courseId, unitId, classId, classNo, con
       _: String(Date.now())
     });
 
-    const response = await fetch(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
       method: "GET",
       credentials: "include",
       headers

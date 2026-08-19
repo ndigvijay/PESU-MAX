@@ -291,7 +291,9 @@ export async function getAllPESUDataNested() {
       classes: (unit.classes || []).map(cls => ({
         id: cls.id,
         className: cls.className,
-        classType: cls.classType
+        classType: cls.classType,
+        // Needed downstream to skip content types this class has nothing for.
+        contentTypes: cls.contentTypes
       }))
     }))
   }));

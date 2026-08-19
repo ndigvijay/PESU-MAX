@@ -57,7 +57,10 @@ export const downloadSelectedMaterials = createAsyncThunk(
                   unitNumber: unitIndex + 1,
                   classId: cls.id,
                   className: cls.className,
-                  classIndex: classIndexInUnit
+                  classIndex: classIndexInUnit,
+                  // Which content types this class actually has, so the download
+                  // loop can skip combinations PESU has nothing for.
+                  availableContentTypes: Array.isArray(cls.contentTypes) ? cls.contentTypes : null
                 });
               }
             }

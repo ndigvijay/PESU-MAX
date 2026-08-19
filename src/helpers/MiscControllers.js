@@ -1,12 +1,25 @@
 import { load } from "../utils/storage.js";
 
+// A worker pool, not a fixed-window batcher. The previous version sliced items
+// into groups of `concurrency` and awaited each group fully before starting the
+// next, so every group ran at the speed of its slowest member and left the other
+// slots idle. Here each worker takes the next item as soon as it is free, which
+// keeps `concurrency` requests genuinely in flight. Results stay in input order.
 export const parallelBatch = async (items, asyncFn, concurrency = 5) => {
-  const results = [];
-  for (let i = 0; i < items.length; i += concurrency) {
-    const batch = items.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map(asyncFn));
-    results.push(...batchResults);
-  }
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await asyncFn(items[index], index, items);
+    }
+  };
+
+  const workerCount = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: workerCount }, worker));
+
   return results;
 };
 
