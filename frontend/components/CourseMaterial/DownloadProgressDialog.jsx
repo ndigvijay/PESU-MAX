@@ -90,7 +90,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 variant="body2"
                 sx={{
                   mt: 0.5,
-                  color: '#888',
+                  color: theme.colors.secondary,
                   fontSize: '11px'
                 }}
               >
