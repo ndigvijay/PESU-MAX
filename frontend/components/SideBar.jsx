@@ -11,6 +11,7 @@ import Attendance from '../Pages/Attendance.jsx';
 import GPACalculator from '../Pages/GPACalculator.jsx';
 import PYQ from '../Pages/PYQ.jsx';
 const logoUrl = chrome.runtime.getURL("icons/Pes_logo_square_ui.png");
+import StarIcon from '@mui/icons-material/Star';
 
 
 
@@ -80,9 +81,29 @@ const Sidebar = () => {
                             PESU-MAX
                         </Typography>
                     </Box>
-                    <IconButton onClick={HandleClose} size="large" sx={{ color: '#333' }}>
-                        <ExitToAppIcon fontSize="large" />
-                    </IconButton>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <a
+                            href="https://github.com/ndigvijay/PESU-MAX/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                color: theme.colors.starGold,
+                                fontStyle: 'italic',
+                                textDecoration: 'underline',
+                                fontSize: '13px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                        >
+                            <StarIcon sx={{ fontSize: '16px', color: theme.colors.starGold }}/>
+                            Star This Project
+                            <StarIcon sx={{ fontSize: '16px', color: theme.colors.starGold }}/>
+                        </a>
+                        <IconButton onClick={HandleClose} size="large" sx={{ color: '#333' }}>
+                            <ExitToAppIcon fontSize="large" />
+                        </IconButton>
+                    </Box>
                 </Box>
                 <Divider 
                     sx={{ 

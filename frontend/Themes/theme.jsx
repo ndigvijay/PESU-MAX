@@ -6,6 +6,7 @@ const theme = {
     secondaryHover: '#1D2F5F',
     primaryLight: 'rgba(245, 130, 31, 0.12)',
     secondaryLight: 'rgba(35, 58, 118, 0.08)',
+    starGold: '#FFD700',
   },
   table: {
     rowEvenBg: 'rgba(245, 130, 31, 0.08)',
