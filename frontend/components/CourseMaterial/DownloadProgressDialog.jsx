@@ -52,13 +52,13 @@ const DownloadProgressDialog = ({ open, onClose }) => {
         {downloading && (
           <Box sx={{ width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
-                {downloadProgress.status === 'merging'
-                  ? `Merging ${downloadProgress.mergeContentType ? downloadProgress.mergeContentType.toLowerCase() : 'files'} ${downloadProgress.current} of ${downloadProgress.total}`
-                  : downloadProgress.status === 'zipping'
-                    ? 'Creating ZIP file...'
+              {downloadProgress.status !== 'zipping' && (
+                <Typography variant="body2" sx={{ color: '#666', fontSize: '12px' }}>
+                  {downloadProgress.status === 'merging'
+                    ? `Merging ${downloadProgress.mergeContentType ? downloadProgress.mergeContentType.toLowerCase() : 'files'} ${downloadProgress.current} of ${downloadProgress.total}`
                     : `Downloading ${downloadProgress.current} of ${downloadProgress.total}`}
-              </Typography>
+                </Typography>
+              )}
               <Typography variant="body2" sx={{ color: theme.colors.primary, fontSize: '12px', fontWeight: '500' }}>
                 {downloadProgress.total > 0 
                   ? `${Math.round((downloadProgress.current / downloadProgress.total) * 100)}%` 
@@ -76,7 +76,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
               variant="body2" 
               sx={{ 
                 mt: 1, 
-                color: '#888', 
+                color: downloadProgress.status === 'zipping' ? theme.colors.secondary : '#888', 
                 fontSize: '11px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
