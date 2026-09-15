@@ -384,6 +384,11 @@ async function mergeSubjectContentPdfs(files) {
 // Download a single file from URL
 async function downloadSingleFile(url) {
   try {
+    const allowedHost = new URL(BASE_URL).hostname;
+    if (new URL(url, BASE_URL).hostname !== allowedHost) {
+      throw new Error('Refusing to download from untrusted host');
+    }
+
     const response = await fetch(url, {
       method: 'GET',
       credentials: 'include'
