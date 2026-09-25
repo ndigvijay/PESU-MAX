@@ -7,3 +7,7 @@ export function load(key) {
     chrome.storage.local.get(key, (data) => res(data[key]));
   });
 }
+
+export function remove(key) {
+  return chrome.storage.local.remove(key);
+}
