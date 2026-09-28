@@ -5,6 +5,7 @@ export const SIDE_MENU_COLLAPSED_KEY = "sideMenuCollapsed";
 export const SIDE_MENU_ORDER_KEY = "sideMenuOrder";
 export const COURSE_MATERIAL_COLUMNS_KEY = "courseMaterialColumns";
 export const START_PAGE_KEY = "startPage";
+export const BACK_NAVIGATION_KEY = "backNavigationEnabled";
 export const ACADEMY_CREDENTIAL_KEY = "academyAuth";
 export const RELOGIN_GUARD_KEY = "pesuMaxReloginAt";
 export const REJECT_COUNT_KEY = "pesuMaxRejectCount";
