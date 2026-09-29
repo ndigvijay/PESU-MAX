@@ -73,10 +73,13 @@ const readControl = (control) =>
     return { type: "property", target, name, oldValue: target[name] };
   });
 
+const insideAddedContent = new WeakSet();
+
 export function revert(records) {
   const redo = [];
   for (let i = records.length - 1; i >= 0; i -= 1) {
     const record = records[i];
+    if (insideAddedContent.has(record)) continue;
     if (record.type === "property") {
       redo.push({ type: "property", target: record.target, name: record.name, oldValue: record.target[record.name] });
       record.target[record.name] = record.oldValue;
@@ -114,11 +117,21 @@ export function createRecorder($, contentRoot, menuList, stack) {
       !(record.type === "attributes" && (record.target === contentRoot || record.target === menuList))
     );
 
+  function track(step, record) {
+    if (step.added.some((node) => node.contains(record.target))) insideAddedContent.add(record);
+    if (record.type !== "childList") return;
+    record.addedNodes.forEach((node) => {
+      if (node.nodeType === 1) step.added.push(node);
+    });
+  }
+
   function accept(records) {
     const kept = relevant(records);
     if (!kept.length) return;
     lastChange = Date.now();
-    if (open) open.records.push(...kept);
+    if (!open) return;
+    kept.forEach((record) => track(open, record));
+    open.records.push(...kept);
   }
 
   function closeStep(carryFormChanges) {
@@ -158,7 +171,13 @@ export function createRecorder($, contentRoot, menuList, stack) {
   function openStep(action, formChanges) {
     const carried = closeStep(true);
     const active = menuList && menuList.querySelector(`li.active[id^="${MENU_ITEM_ID_PREFIX}"]`);
-    open = { records: carried.concat(formChanges), action, base: active ? active.id : null, started: Date.now() };
+    open = {
+      records: carried.concat(formChanges),
+      added: [],
+      action,
+      base: active ? active.id : null,
+      started: Date.now()
+    };
     lastChange = Date.now();
     timer = setTimeout(check, POLL_MS);
   }
@@ -212,6 +231,9 @@ export function createRecorder($, contentRoot, menuList, stack) {
     return { records, error };
   }
 
+  const hasPendingStep = () =>
+    Boolean(open) && !open.cancelled && open.records.some((record) => record.type !== "property");
+
   async function cancelStep() {
     const step = open;
     if (!step) return;
@@ -240,5 +262,5 @@ export function createRecorder($, contentRoot, menuList, stack) {
   document.addEventListener("click", onUserEvent, true);
   document.addEventListener("change", onUserEvent, true);
 
-  return { capture, cancelStep, idle, release };
+  return { capture, cancelStep, hasPendingStep, idle, release };
 }

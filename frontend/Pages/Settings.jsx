@@ -77,6 +77,12 @@ const Settings = () => {
           options={START_PAGE_OPTIONS}
         />
 
+        <SettingsToggleRow
+          storageKey={BACK_NAVIGATION_KEY}
+          title="disable back button"
+          description="Back returns to your previous page instead of logging you out. persists on the next page load."
+        />
+
         <SettingsEditRow
           title="Re-order material types"
           description="Move or hide the material columns of the Course Units table."
@@ -101,12 +107,6 @@ const Settings = () => {
           storageKey={SIDE_MENU_STATE_KEY}
           title="Keep side menu state"
           description="Puts the side menu back the way you left it, collapsed or open."
-        />
-
-        <SettingsToggleRow
-          storageKey={BACK_NAVIGATION_KEY}
-          title="Fix back button"
-          description="Back returns to your previous page instead of the sign-in screen. Applies on next page load."
         />
 
         {isEditing && (

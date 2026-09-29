@@ -12,6 +12,15 @@ function replaceEntry(entry) {
   history.replaceState(Object.assign({}, base, { [STATE_KEY]: entry }), "");
 }
 
+const controlKind = (action) => `${action.kind}|${action.selector.replace(/:nth-of-type\(\d+\)/g, "")}`;
+
+function extendSteps(steps, action) {
+  if (action.menu) return [action];
+  const last = steps[steps.length - 1];
+  const kept = last && controlKind(last) === controlKind(action) ? steps.slice(0, -1) : steps;
+  return kept.concat([action]).slice(-MAX_KEPT_STEPS);
+}
+
 const menuAction = (menuId) => ({
   kind: "click",
   selector: `#${menuId} > a`,
@@ -52,7 +61,7 @@ export function createHistoryStack($) {
       kind: ENTRY_VIEW,
       id: newId(),
       index: current.index + 1,
-      steps: (action.menu ? [action] : current.steps.concat([action])).slice(-MAX_KEPT_STEPS),
+      steps: extendSteps(current.steps, action),
       base: action.menu ? null : fromRoot ? base : current.base
     };
     dropFrom(entry.index);
@@ -108,6 +117,16 @@ export function createHistoryStack($) {
     }
   }
 
+  async function stayOnCurrent() {
+    busy = true;
+    try {
+      await recorder.cancelStep();
+    } finally {
+      busy = false;
+    }
+    history.forward();
+  }
+
   function onPopState(event) {
     const target = entryOf(event.state);
     if (!target) return;
@@ -119,7 +138,12 @@ export function createHistoryStack($) {
       pending = true;
       return;
     }
-    if (target.id !== current.id) void moveTo(target);
+    if (target.id === current.id) return;
+    if (target.index === current.index - 1 && recorder.hasPendingStep()) {
+      void stayOnCurrent();
+      return;
+    }
+    void moveTo(target);
   }
 
   function start(attachedRecorder) {
