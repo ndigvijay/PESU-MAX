@@ -1,16 +1,17 @@
 import { load } from "../../utils/storage.js";
 import { SIDE_MENU_DOCK_KEY, SIDE_MENU_DOCK_SECTIONS_KEY } from "../../utils/storageKeys.js";
-import {
-  SIDE_MENU_CONTENT_SELECTOR,
-  SIDE_MENU_NAME_SELECTOR,
-  SIDE_MENU_SELECTOR,
-  menuItems
-} from "../academyPage.js";
+import { SIDE_MENU_CONTENT_SELECTOR, SIDE_MENU_SELECTOR, menuItems } from "../academyPage.js";
 import { MENU_ICON_BY_ID } from "../menuIcons/menuIconsApply.js";
 import { PANEL_ID, buildAllSectionsPanel } from "./allSectionsPanel.js";
 import { glyph } from "./dockIcon.js";
 import { DOCK_ATTR, writeDockMirror } from "./dockState.js";
-import { dockSections, sectionFor } from "./sideMenuSections.js";
+import {
+  dockSections,
+  menuSections,
+  readMenuSections,
+  sectionLabel,
+  storeMenuSections
+} from "./sideMenuSections.js";
 
 export const DOCK_ID = "pesu-max-dock";
 export const ALL_BUTTON_ID = "pesu-max-dock-all";
@@ -30,16 +31,6 @@ let savedWidths = null;
 const menuList = () => document.querySelector(LIST_SELECTOR);
 
 export const isDockOn = () => document.documentElement.hasAttribute(DOCK_ATTR);
-
-function siteLabel(item) {
-  const node = item.querySelector(SIDE_MENU_NAME_SELECTOR);
-  return node ? node.textContent.replace(/\s+/g, " ").trim() : "";
-}
-
-function labelFor(id, available) {
-  const section = sectionFor(id);
-  return section ? section.label : available.get(id);
-}
 
 function labelledButton(iconName, label) {
   const button = document.createElement("button");
@@ -101,7 +92,7 @@ function build(sections) {
   if (!list || !menu) return null;
 
   building = true;
-  const available = new Map(menuItems(list).map((item) => [item.id, siteLabel(item)]));
+  const available = new Map(menuItems(list).map((item) => [item.id, sectionLabel(item)]));
 
   const nav = document.createElement("nav");
   nav.id = DOCK_ID;
@@ -111,7 +102,7 @@ function build(sections) {
   sections
     .filter((id) => available.has(id))
     .forEach((id) => {
-      const button = dockButton(id, labelFor(id, available));
+      const button = dockButton(id, available.get(id));
       items.set(id, button);
       nav.appendChild(button);
     });
@@ -219,7 +210,7 @@ function apply(enabled, value) {
     return;
   }
 
-  sectionsValue = dockSections(value);
+  sectionsValue = dockSections(value, menuSections(readMenuSections()));
   claimRailWidth();
   if (!mount(sectionsValue)) {
     root.removeAttribute(DOCK_ATTR);
@@ -232,6 +223,7 @@ function apply(enabled, value) {
 
 // Off by default.
 export async function initSideMenuDock() {
+  storeMenuSections(readMenuSections()).catch(() => { });
   const [enabled, value] = await Promise.all([
     load(SIDE_MENU_DOCK_KEY),
     load(SIDE_MENU_DOCK_SECTIONS_KEY)

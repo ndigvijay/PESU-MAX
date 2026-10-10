@@ -1,12 +1,7 @@
 import { MENU_ICON_BY_ID } from "../menuIcons/menuIconsApply.js";
 import { glyph } from "./dockIcon.js";
 import { DOCK_CLOSING_ATTR, DOCK_OPEN_ATTR } from "./dockState.js";
-import {
-  MENU_SECTIONS,
-  OTHER_CATEGORY,
-  SECTION_CATEGORIES,
-  extraSections
-} from "./sideMenuSections.js";
+import { SECTION_CATEGORIES, menuSections } from "./sideMenuSections.js";
 
 export const PANEL_ID = "pesu-max-all-sections";
 export const SCRIM_ID = "pesu-max-dock-scrim";
@@ -15,22 +10,13 @@ const ENTRY_CLASS = "pesu-max-dock-entry";
 const ACTIVE_ATTR = "data-pesu-max-active";
 const CLOSE_MS = 160;
 
-const groupsFor = (available) => [
-  ...SECTION_CATEGORIES.map((category) => ({
+const groupsFor = (available) => {
+  const sections = menuSections([...available].map(([id, label]) => ({ id, label })));
+  return SECTION_CATEGORIES.map((category) => ({
     category,
-    sections: MENU_SECTIONS.filter(
-      (section) => section.category === category && available.has(section.id)
-    )
-  })),
-  {
-    category: OTHER_CATEGORY,
-    sections: extraSections(available).map((id) => ({
-      id,
-      label: available.get(id),
-      category: OTHER_CATEGORY
-    }))
-  }
-].filter((group) => group.sections.length > 0);
+    sections: sections.filter((section) => section.category === category)
+  })).filter((group) => group.sections.length > 0);
+};
 
 function entry(item) {
   const button = document.createElement("button");

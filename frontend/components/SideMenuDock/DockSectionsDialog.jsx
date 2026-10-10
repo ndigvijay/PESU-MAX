@@ -21,12 +21,15 @@ import {
   switchSx
 } from "../../styles/styles.js";
 import { load, save } from "../../../src/utils/storage.js";
-import { SIDE_MENU_DOCK_SECTIONS_KEY } from "../../../src/utils/storageKeys.js";
+import {
+  SIDE_MENU_DOCK_SECTIONS_KEY,
+  SIDE_MENU_SECTIONS_KEY
+} from "../../../src/utils/storageKeys.js";
 import {
   DOCK_SECTION_LIMIT,
-  MENU_SECTIONS,
   SECTION_CATEGORIES,
-  dockSections
+  dockSections,
+  menuSections
 } from "../../../src/content/sideMenuDock";
 
 const headerRowSx = {
@@ -66,6 +69,7 @@ const categorySx = {
 };
 
 const DockSectionsDialog = ({ open, onClose }) => {
+  const [sections, setSections] = useState([]);
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -82,9 +86,12 @@ const DockSectionsDialog = ({ open, onClose }) => {
     setLoading(true);
     setError("");
     setNotice("");
-    load(SIDE_MENU_DOCK_SECTIONS_KEY)
-      .then((stored) => {
-        if (!stale) setDraft(dockSections(stored));
+    Promise.all([load(SIDE_MENU_SECTIONS_KEY), load(SIDE_MENU_DOCK_SECTIONS_KEY)])
+      .then(([storedSections, storedDock]) => {
+        if (stale) return;
+        const found = menuSections(storedSections);
+        setSections(found);
+        setDraft(dockSections(storedDock, found));
       })
       .catch(() => {
         if (!stale) setError("Could not load your dock sections. Please retry.");
@@ -110,12 +117,14 @@ const DockSectionsDialog = ({ open, onClose }) => {
     setDraft(next ? [...chosen, id] : chosen.filter((entry) => entry !== id));
   };
 
+  const empty = !loading && sections.length === 0;
+
   const handleSave = async () => {
-    if (loading || saving || !draft) return;
+    if (loading || saving || !draft || empty) return;
     setSaving(true);
     setError("");
     try {
-      await save(SIDE_MENU_DOCK_SECTIONS_KEY, dockSections(chosen));
+      await save(SIDE_MENU_DOCK_SECTIONS_KEY, dockSections(chosen, sections));
       onClose();
     } catch (saveError) {
       setError("Could not save your dock sections. Please try again.");
@@ -146,6 +155,10 @@ const DockSectionsDialog = ({ open, onClose }) => {
           <Box sx={{ display: "flex", justifyContent: "center", padding: "24px" }}>
             <CircularProgress size={24} />
           </Box>
+        ) : empty ? (
+          <Typography variant="body2" sx={sectionLabelSx}>
+            Sign in to PESU Academy and open any page so PESU-MAX can find your sections.
+          </Typography>
         ) : (
           <Stack spacing="8px">
             <Box sx={headerRowSx}>
@@ -156,12 +169,14 @@ const DockSectionsDialog = ({ open, onClose }) => {
                 {chosen.length} / {DOCK_SECTION_LIMIT}
               </Typography>
             </Box>
-            {SECTION_CATEGORIES.map((category) => (
+            {SECTION_CATEGORIES.filter((category) =>
+              sections.some((section) => section.category === category)
+            ).map((category) => (
               <Box key={category}>
                 <Typography variant="body2" sx={categorySx}>
                   {category}
                 </Typography>
-                {MENU_SECTIONS.filter((section) => section.category === category).map((section) => {
+                {sections.filter((section) => section.category === category).map((section) => {
                   const on = chosen.includes(section.id);
                   return (
                     <Box key={section.id} sx={sectionRowSx}>
@@ -203,7 +218,7 @@ const DockSectionsDialog = ({ open, onClose }) => {
           disableElevation
           sx={popupPrimaryButtonSx}
           onClick={handleSave}
-          disabled={saving || loading || !draft}
+          disabled={saving || loading || !draft || empty}
         >
           Save
         </Button>
