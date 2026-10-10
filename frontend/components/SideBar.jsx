@@ -37,7 +37,6 @@ const Sidebar = () => {
             anchor="right"
             open={isOpen}
             onClose={HandleClose}
-            hideBackdrop
             slotProps={{
                 backdrop: {
                     sx: { backgroundColor: 'transparent' }
