@@ -305,6 +305,64 @@ export const settingsActionButtonSx = {
   },
 };
 
+export const settingsSectionTitleSx = {
+  color: theme.colors.secondary,
+  fontWeight: 700,
+  fontSize: '12px',
+  letterSpacing: '0.6px',
+  textTransform: 'uppercase',
+  paddingLeft: '2px',
+};
+
+export const settingsGroupSx = {
+  position: 'relative',
+  overflow: 'hidden',
+  padding: '8px',
+  border: `1.5px solid ${theme.colors.secondaryBorder}`,
+  borderRadius: '14px',
+  backgroundColor: theme.colors.secondaryLight,
+};
+
+export const settingsGroupTitleSx = {
+  color: theme.colors.secondary,
+  fontWeight: 600,
+  fontSize: '13px',
+  paddingLeft: '4px',
+};
+
+// "NEW" corner ribbon and icon badge
+export const newRibbonSx = {
+  position: 'absolute',
+  top: '8px',
+  right: '-32px',
+  transform: 'rotate(45deg)',
+  backgroundColor: theme.colors.primary,
+  color: theme.colors.onSolid,
+  fontSize: '8px',
+  fontWeight: 800,
+  letterSpacing: '1px',
+  padding: '1px 32px',
+  lineHeight: 1.4,
+  zIndex: 1,
+  pointerEvents: 'none',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+};
+
+export const newBadgeSx = {
+  '& .MuiBadge-badge': {
+    backgroundColor: theme.colors.primary,
+    color: theme.colors.onSolid,
+    fontSize: '8px',
+    fontWeight: 800,
+    letterSpacing: '0.5px',
+    height: '14px',
+    minWidth: 'auto',
+    padding: '0 4px',
+    borderRadius: '7px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+  },
+};
+
 // Row hint and warning
 export const settingsHintSx = {
   color: theme.colors.secondary,

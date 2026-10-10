@@ -44,7 +44,7 @@ const FILLED_ICONS = new Set(["DirectionsCar"]);
 const iconPaths = (name) =>
   MENU_ICON_PATHS[FILLED_ICONS.has(name) ? name : `${name}Outlined`] || null;
 
-function buildIcon(name) {
+export function buildIcon(name) {
   const paths = iconPaths(name);
   if (!paths) return null;
 

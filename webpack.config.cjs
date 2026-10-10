@@ -41,6 +41,10 @@ module.exports = (env, argv) => {
         import: path.resolve(__dirname, 'src/content/sideMenuStateStart.js'),
         filename: 'content/sideMenuStateStart.js'
       },
+      'content/sideMenuDockStart': {
+        import: path.resolve(__dirname, 'src/content/sideMenuDockStart.js'),
+        filename: 'content/sideMenuDockStart.js'
+      },
       'content/themeStart': {
         import: path.resolve(__dirname, 'src/content/theme/documentStart.js'),
         filename: 'content/themeStart.js'
@@ -141,6 +145,10 @@ module.exports = (env, argv) => {
           {
             from: 'public/content/sideMenuState.css',
             to: 'content/sideMenuState.css'
+          },
+          {
+            from: 'public/content/sideMenuDock.css',
+            to: 'content/sideMenuDock.css'
           },
           {
             from: 'public/content/theme.css',

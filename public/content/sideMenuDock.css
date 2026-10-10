@@ -1,0 +1,405 @@
+/* Dock */
+html[data-pesu-max-dock] {
+  --pesu-max-dock-width: 90px;
+  --pesu-max-dock-bright: var(--pesu-max-accent-bright, #0091cd);
+  --pesu-max-dock-ink: #1c2433;
+  --pesu-max-dock-muted: #5b6472;
+  --pesu-max-dock-surface: #ffffff;
+  --pesu-max-dock-tile: #f1f4f9;
+  --pesu-max-dock-field: #f3f5f8;
+  --pesu-max-dock-line: rgba(255, 255, 255, 0.5);
+  --pesu-max-dock-hover: rgba(255, 255, 255, 0.14);
+}
+
+/* Original sidemenu is kept in DOM. */
+html[data-pesu-max-dock] body .menu-left {
+  width: var(--pesu-max-dock-width) !important;
+}
+
+html[data-pesu-max-dock] body .menu-left > ul {
+  display: none !important;
+}
+
+/* Rail stays put and holds the sections without scrolling. */
+html[data-pesu-max-dock] #pesu-max-dock {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100vh;
+  padding: 10px 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: filter 0.18s ease;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-item {
+  position: relative;
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  margin: 0 6px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 14px;
+  background-color: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 24px;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+/* Dock sections centred between the top and the All button. */
+html[data-pesu-max-dock] .pesu-max-dock-item:first-child {
+  margin-top: auto;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-item:hover {
+  background-color: var(--pesu-max-dock-hover);
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-item:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-item[data-pesu-max-dock-active] {
+  background-color: var(--pesu-max-dock-bright);
+}
+
+
+html[data-pesu-max-dock] .pesu-max-dock-item[data-pesu-max-dock-active]::before,
+html[data-pesu-max-dock] #pesu-max-dock-all[data-pesu-max-dock-elsewhere]::before,
+html[data-pesu-max-dock] #pesu-max-dock-all[data-pesu-max-dock-open]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -6px;
+  width: 4px;
+  height: 64%;
+  border-radius: 0 4px 4px 0;
+  background-color: var(--pesu-max-bg, #ffffff);
+  transform: translateY(-50%);
+}
+
+html[data-pesu-max-dock] #pesu-max-dock-all {
+  margin-top: auto;
+  border: 1px dashed var(--pesu-max-dock-line);
+}
+
+html[data-pesu-max-dock] #pesu-max-dock-all[data-pesu-max-dock-elsewhere],
+html[data-pesu-max-dock] #pesu-max-dock-all[data-pesu-max-dock-open] {
+  background-color: var(--pesu-max-dock-bright);
+  border-color: rgba(255, 255, 255, 0.72);
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-label {
+  max-width: 100%;
+  overflow-wrap: break-word;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-glyph .pesu-max-menu-icon {
+  display: block;
+  width: 1.3em;
+  height: 1.3em;
+  fill: currentColor;
+}
+
+html[data-pesu-max-dock] .pesu-max-dock-item .pesu-max-dock-label {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+/* All section. */
+#pesu-max-all-sections {
+  position: fixed;
+  top: 10px;
+  right: 55%;
+  bottom: 10px;
+  left: calc(var(--pesu-max-dock-width, 90px) + 20px);
+  z-index: 1035;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px;
+  background-color: var(--pesu-max-dock-surface);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.26);
+  font-family: var(--pesu-max-font, inherit);
+  transform-origin: left bottom;
+  animation: pesu-max-dock-pop 0.18s ease-out;
+}
+
+/* Tail aiming at the All button */
+#pesu-max-all-sections::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  bottom: 39px;
+  z-index: -1;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background-color: var(--pesu-max-dock-surface);
+  box-shadow: -6px 6px 12px rgba(15, 23, 42, 0.12);
+  transform: rotate(45deg);
+}
+
+#pesu-max-dock-scrim {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--pesu-max-dock-width, 90px);
+  z-index: 1034;
+  background-color: rgba(15, 23, 42, 0.28);
+  animation: pesu-max-dock-fade 0.18s ease-out;
+}
+
+#pesu-max-dock-scrim[hidden] {
+  display: none;
+}
+
+#pesu-max-all-sections[data-pesu-max-dock-closing] {
+  animation: pesu-max-dock-pop-out 0.16s ease-in forwards;
+}
+
+#pesu-max-dock-scrim[data-pesu-max-dock-closing] {
+  animation: pesu-max-dock-fade-out 0.16s ease-in forwards;
+}
+
+#pesu-max-all-sections[hidden] {
+  display: none;
+}
+
+@keyframes pesu-max-dock-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pesu-max-dock-pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+@keyframes pesu-max-dock-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pesu-max-dock-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pesu-max-all-sections,
+  #pesu-max-dock-scrim {
+    animation: none;
+  }
+
+  html[data-pesu-max-dock] #pesu-max-dock,
+  html[data-pesu-max-dock] .pesu-max-dock-item {
+    transition: none;
+  }
+}
+
+#pesu-max-all-sections .pesu-max-dock-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 32px 14px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-panel-head h2 {
+  margin: 0;
+  color: var(--pesu-max-dock-ink);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+#pesu-max-all-sections .pesu-max-dock-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background-color: transparent;
+  color: var(--pesu-max-dock-muted);
+  cursor: pointer;
+  transition: background-color 0.14s ease;
+}
+
+#pesu-max-all-sections .pesu-max-dock-close:hover {
+  background-color: var(--pesu-max-dock-tile);
+}
+
+#pesu-max-all-sections .pesu-max-dock-close .pesu-max-dock-glyph {
+  font-size: 19px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  margin: 0 32px;
+  padding: 0 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background-color: var(--pesu-max-dock-field);
+  color: var(--pesu-max-dock-muted);
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+#pesu-max-all-sections .pesu-max-dock-field:focus-within {
+  border-color: var(--pesu-max-dock-bright);
+  background-color: var(--pesu-max-dock-surface);
+}
+
+#pesu-max-all-sections .pesu-max-dock-field .pesu-max-dock-glyph {
+  font-size: 18px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background-color: transparent;
+  color: var(--pesu-max-dock-ink);
+  font-family: inherit;
+  font-size: 14px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-field input::placeholder {
+  color: #757575;
+}
+
+#pesu-max-all-sections .pesu-max-dock-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 32px 36px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-group h3 {
+  margin: 18px 0 6px;
+  color: var(--pesu-max-dock-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#pesu-max-all-sections .pesu-max-dock-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 18px;
+}
+
+@media (max-width: 1280px) {
+  #pesu-max-all-sections .pesu-max-dock-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+#pesu-max-all-sections .pesu-max-dock-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background-color: transparent;
+  color: var(--pesu-max-dock-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 0.14s ease;
+}
+
+#pesu-max-all-sections .pesu-max-dock-entry:hover {
+  background-color: #f7f9fc;
+}
+
+#pesu-max-all-sections .pesu-max-dock-entry[data-pesu-max-active]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: var(--pesu-max-dock-bright);
+  opacity: 0.12;
+}
+
+#pesu-max-all-sections .pesu-max-dock-entry > * {
+  position: relative;
+}
+
+#pesu-max-all-sections .pesu-max-dock-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background-color: var(--pesu-max-dock-tile);
+  color: var(--pesu-max-dock-bright);
+  font-size: 18px;
+}
+
+#pesu-max-all-sections .pesu-max-dock-entry[data-pesu-max-active] .pesu-max-dock-tile {
+  background-color: var(--pesu-max-dock-bright);
+  color: #ffffff;
+}
+
+#pesu-max-all-sections .pesu-max-dock-empty {
+  margin: 20px 0 0;
+  color: var(--pesu-max-dock-muted);
+  font-size: 13px;
+}

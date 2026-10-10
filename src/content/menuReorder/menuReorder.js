@@ -1,6 +1,7 @@
 import { load, save } from "../../utils/storage.js";
 import { SIDE_MENU_ORDER_KEY } from "../../utils/storageKeys.js";
 import { MENU_LIST_ID, isHome, menuItems } from "../academyPage.js";
+import { isDockOn } from "../sideMenuDock/sideMenuDock.js";
 import { buildEditBar, setEditBarBusy, setEditBarMessage } from "./menuReorderBar.js";
 import { enableReordering, makeDraggable } from "./menuReorderDrag.js";
 import { BAR_ID, EDITING, injectStyle } from "./menuReorderStyle.js";
@@ -99,6 +100,12 @@ function sync() {
     return;
   }
 
+  if (isDockOn()) {
+    if (editing) exitMenuEdit();
+    else updateState();
+    return;
+  }
+
   if (!wiredLists.has(list)) {
     wiredLists.add(list);
     naturalOrders.set(list, []);
@@ -127,7 +134,7 @@ function sync() {
 
 export function canEditMenu() {
   const list = menuList();
-  return !!list && menuItems(list).length > 0;
+  return !isDockOn() && !!list && menuItems(list).length > 0;
 }
 
 export function isMenuEditActive() {
@@ -136,7 +143,7 @@ export function isMenuEditActive() {
 
 export function startMenuEdit() {
   const list = menuList();
-  if (!list || !menuItems(list).length) return false;
+  if (!list || !menuItems(list).length || isDockOn()) return false;
   editing = true;
   list.classList.add(EDITING);
   buildEditBar({ onReset: resetMenuOrder, onLock: lockMenuOrder });

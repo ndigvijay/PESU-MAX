@@ -1,5 +1,5 @@
 import { load, save } from "../utils/storage.js";
-import { SIDE_MENU_COLLAPSED_KEY, SIDE_MENU_STATE_KEY } from "../utils/storageKeys.js";
+import { SIDE_MENU_COLLAPSED_KEY, SIDE_MENU_DOCK_KEY, SIDE_MENU_STATE_KEY } from "../utils/storageKeys.js";
 import {
   SIDE_MENU_ARROW_SELECTOR,
   SIDE_MENU_CONTENT_SELECTOR,
@@ -97,7 +97,8 @@ function observeMenu(el) {
 }
 
 export async function initSideMenuState() {
-  enabled = (await load(SIDE_MENU_STATE_KEY)) === true;
+  const dockOn = (await load(SIDE_MENU_DOCK_KEY)) === true;
+  enabled = !dockOn && (await load(SIDE_MENU_STATE_KEY)) === true;
   remembered = (await load(SIDE_MENU_COLLAPSED_KEY)) === true;
   writeMirror();
 
@@ -130,7 +131,27 @@ export async function initSideMenuState() {
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local" || !changes[SIDE_MENU_STATE_KEY]) return;
+    if (area !== "local") return;
+
+    if (changes[SIDE_MENU_DOCK_KEY]) {
+      const dockOn = changes[SIDE_MENU_DOCK_KEY].newValue === true;
+      if (dockOn) {
+        enabled = false;
+        document.documentElement.removeAttribute(SIDE_MENU_ATTR);
+        writeMirror();
+        return;
+      }
+      load(SIDE_MENU_STATE_KEY)
+        .then((value) => {
+          enabled = value === true;
+          if (enabled) setCollapsed(remembered);
+          writeMirror();
+        })
+        .catch(() => {});
+      return;
+    }
+
+    if (!changes[SIDE_MENU_STATE_KEY]) return;
     enabled = changes[SIDE_MENU_STATE_KEY].newValue === true;
     if (enabled) {
       remembered = state() === SIDE_MENU_HIDDEN;

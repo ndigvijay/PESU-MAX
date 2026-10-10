@@ -4,7 +4,7 @@ import SettingsRow from "./SettingsRow.jsx";
 import useStoredSetting from "./useStoredSetting.js";
 import { switchSx, popupSecondaryButtonSx } from "../../styles/styles.js";
 
-const SettingsToggleRow = ({ storageKey, title, description, onDisable }) => {
+const SettingsToggleRow = ({ storageKey, title, description, onDisable, disabled }) => {
   const setting = useStoredSetting(storageKey, false, title);
   const [clearing, setClearing] = useState(false);
   const [cleanupError, setCleanupError] = useState("");
@@ -34,7 +34,7 @@ const SettingsToggleRow = ({ storageKey, title, description, onDisable }) => {
         <Switch
           checked={setting.value === true}
           onChange={handleChange}
-          disabled={!setting.ready || setting.saving || clearing || Boolean(cleanupError)}
+          disabled={!setting.ready || setting.saving || clearing || Boolean(cleanupError) || disabled}
           sx={switchSx}
           slotProps={{ input: { "aria-label": title } }}
         />

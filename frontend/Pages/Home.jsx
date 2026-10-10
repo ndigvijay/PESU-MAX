@@ -109,47 +109,20 @@ const Home = () => {
           >
             Know your Faculty
           </Button>)}
-          {isLoggedIn && (<Box sx={{ position: "relative", overflow: "hidden", borderRadius: "4px", width: "100%" }}>
-            <Button
-              variant="contained"
-              sx={{
-                backgroundColor: theme.colors.secondary,
-                width: '100%',
-                textAlign: 'center',
-                padding: '12px',
-                border: `2px solid ${theme.colors.primary}`,
-                "&:hover": {
-                  backgroundColor: theme.colors.secondaryHover,
-                  border: `2px solid ${theme.colors.primary}`
-                }
-              }}
-              onClick={() => {
-                dispatch(setCurrentPage("pyq"));
-              }}
-            >
-              Download PYQs
-            </Button>
-            <Box
-              sx={{
-                position: "absolute",
-                top: "11px",
-                right: "-30px",
-                transform: "rotate(45deg)",
-                backgroundColor: theme.colors.primary,
-                color: "#fff",
-                fontSize: "9px",
-                fontWeight: 800,
-                letterSpacing: "1px",
-                padding: "2px 32px",
-                lineHeight: 1.4,
-                zIndex: 1,
-                pointerEvents: "none",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.3)"
-              }}
-            >
-              NEW
-            </Box>
-          </Box>)}
+          {isLoggedIn && (<Button
+            variant="contained"
+            sx={{
+              backgroundColor: theme.colors.secondary,
+              width: '100%',
+              textAlign: 'center',
+              padding: '12px'
+            }}
+            onClick={() => {
+              dispatch(setCurrentPage("pyq"));
+            }}
+          >
+            Download PYQs
+          </Button>)}
           <Box
             sx={{
               display: 'flex',

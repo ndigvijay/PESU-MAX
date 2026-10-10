@@ -7,10 +7,13 @@ import theme from "../Themes/theme.jsx";
 import SettingsAccentRow from "../components/Settings/SettingsAccentRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
+import useStoredSetting from "../components/Settings/useStoredSetting.js";
+import { settingsHintSx } from "../styles/styles.js";
 import { FONT_OPTIONS, THEME_OPTIONS } from "../../src/content/theme";
 import {
   MATERIAL_TABLE_KEY,
   MENU_ICONS_KEY,
+  SIDE_MENU_DOCK_KEY,
   THEME_FONT_KEY,
   THEME_PALETTE_KEY,
   TOP_BAR_KEY,
@@ -18,6 +21,8 @@ import {
 
 const Appearance = () => {
   const dispatch = useDispatch();
+  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Side menu style");
+  const dockOn = dock.ready && dock.value === true;
 
   const handleBack = () => {
     dispatch(setCurrentPage("settings"));
@@ -67,7 +72,14 @@ const Appearance = () => {
           storageKey={MENU_ICONS_KEY}
           title="Better icons"
           description="Replaces the side-menu icons with better and bolder icons."
+          disabled={dockOn}
         />
+
+        {dockOn && (
+          <Typography variant="body2" sx={settingsHintSx}>
+            The minimal side menu always uses better icons.
+          </Typography>
+        )}
 
         <SettingsToggleRow
           storageKey={MATERIAL_TABLE_KEY}
