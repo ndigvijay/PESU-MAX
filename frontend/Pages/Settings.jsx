@@ -7,7 +7,9 @@ import theme from "../Themes/theme.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsEditRow from "../components/Settings/SettingsEditRow.jsx";
+import useStoredSetting from "../components/Settings/useStoredSetting.js";
 import MaterialColumnsDialog from "../components/CourseMaterial/MaterialColumnsDialog.jsx";
+import DockSectionsDialog from "../components/SideMenuDock/DockSectionsDialog.jsx";
 import { settingsHintSx, settingsWarningSx } from "../styles/styles.js";
 import {
   getMenuReorderSnapshot,
@@ -18,6 +20,7 @@ import { START_PAGE_OPTIONS } from "../../src/content/startPage";
 import {
   BACK_NAVIGATION_KEY,
   SESSION_KEEPER_KEY,
+  SIDE_MENU_DOCK_KEY,
   SIDE_MENU_STATE_KEY,
   START_PAGE_KEY,
 } from "../../src/utils/storageKeys.js";
@@ -26,6 +29,9 @@ import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js
 const Settings = () => {
   const dispatch = useDispatch();
   const [materialColumnsOpen, setMaterialColumnsOpen] = useState(false);
+  const [dockSectionsOpen, setDockSectionsOpen] = useState(false);
+  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Improved side menu");
+  const dockOn = dock.ready && dock.value === true;
   const { canReorder, isEditing } = useSyncExternalStore(
     subscribeToMenuReorder,
     getMenuReorderSnapshot,
@@ -95,19 +101,52 @@ const Settings = () => {
           onClick={() => setMaterialColumnsOpen(true)}
         />
 
+        <SettingsToggleRow
+          storageKey={SIDE_MENU_DOCK_KEY}
+          title="Improved side menu"
+          description="Replaces the side menu with a dock of your sections and an All sections panel."
+        />
+
+        <SettingsEditRow
+          title="Dock sections"
+          description="Pick the sections that sit in the dock."
+          onClick={() => setDockSectionsOpen(true)}
+          disabled={!dockOn}
+          label="Choose"
+        />
+
+        {dock.ready && !dockOn && (
+          <Typography variant="body2" sx={settingsHintSx}>
+            Turn on the improved side menu to choose your sections.
+          </Typography>
+        )}
+
         <SettingsEditRow
           title="Re-order side menu"
           description="Drag the side-menu into the order you want."
           onClick={handleMenuEdit}
-          disabled={!canReorder || isEditing}
+          disabled={!canReorder || isEditing || dockOn}
           label={isEditing ? "Editing" : "Edit"}
         />
+
+        {dockOn && (
+          <Typography variant="body2" sx={settingsHintSx}>
+            Locked while the improved side menu is on.
+          </Typography>
+        )}
 
         <SettingsToggleRow
           storageKey={SIDE_MENU_STATE_KEY}
           title="Keep side menu state"
           description="Puts the side menu back the way you left it, collapsed or open."
+          disabled={dockOn}
         />
+
+        {dockOn && (
+          <Typography variant="body2" sx={settingsHintSx}>
+            Locked while the improved side menu is on.
+          </Typography>
+        )}
 
         {isEditing && (
           <Typography variant="body2" sx={settingsHintSx}>
@@ -115,7 +154,7 @@ const Settings = () => {
           </Typography>
         )}
 
-        {!canReorder && (
+        {!canReorder && !dockOn && (
           <Typography variant="body2" sx={settingsWarningSx}>
             Open your PESU Academy profile page to re-order the menu.
           </Typography>
@@ -126,6 +165,8 @@ const Settings = () => {
         open={materialColumnsOpen}
         onClose={() => setMaterialColumnsOpen(false)}
       />
+
+      <DockSectionsDialog open={dockSectionsOpen} onClose={() => setDockSectionsOpen(false)} />
     </Box>
   );
 };

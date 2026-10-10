@@ -42,6 +42,12 @@
     },
     {
       "matches": ["https://www.pesuacademy.com/*"],
+      "css": ["content/sideMenuDock.css"],
+      "js": ["content/sideMenuDockStart.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://www.pesuacademy.com/*"],
       "css": ["content/theme.css"],
       "js": ["content/themeStart.js"],
       "run_at": "document_start"

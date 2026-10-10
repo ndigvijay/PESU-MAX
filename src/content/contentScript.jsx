@@ -3,6 +3,7 @@ import { createRoot} from 'react-dom/client';
 import App from '../../frontend/App.jsx';
 import { initMenuReorder } from './menuReorder';
 import { initMenuIcons } from './menuIcons';
+import { initSideMenuDock } from './sideMenuDock';
 import { initMaterialColumns } from './materialColumns';
 import { initMaterialTable } from './materialTable';
 import { startSessionKeeper } from './sessionKeeper.js';
@@ -22,5 +23,6 @@ initTheme();
 
 initMenuReorder();
 initMenuIcons();
+initSideMenuDock();
 initMaterialColumns();
 initMaterialTable();
