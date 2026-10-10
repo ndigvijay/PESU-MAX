@@ -7,6 +7,7 @@ import theme from "../Themes/theme.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsEditRow from "../components/Settings/SettingsEditRow.jsx";
+import SettingsSection from "../components/Settings/SettingsSection.jsx";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
 import MaterialColumnsDialog from "../components/CourseMaterial/MaterialColumnsDialog.jsx";
 import DockSectionsDialog from "../components/SideMenuDock/DockSectionsDialog.jsx";
@@ -26,12 +27,18 @@ import {
 } from "../../src/utils/storageKeys.js";
 import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js";
 
+const SIDE_MENU_STYLE_OPTIONS = [
+  { value: false, label: "Classic" },
+  { value: true, label: "Minimal" },
+];
+
 const Settings = () => {
   const dispatch = useDispatch();
   const [materialColumnsOpen, setMaterialColumnsOpen] = useState(false);
   const [dockSectionsOpen, setDockSectionsOpen] = useState(false);
-  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Improved side menu");
+  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Side menu style");
   const dockOn = dock.ready && dock.value === true;
+  const classicOn = dock.ready && dock.value !== true;
   const { canReorder, isEditing } = useSyncExternalStore(
     subscribeToMenuReorder,
     getMenuReorderSnapshot,
@@ -67,98 +74,91 @@ const Settings = () => {
         </Typography>
       </Box>
 
-      <Stack spacing="8px">
-        <SettingsToggleRow
-          storageKey={SESSION_KEEPER_KEY}
-          title="Keep me signed in"
-          description="Automatically signs you in when PESU Academy logs you out. "
-          onDisable={forgetStoredCredentials}
-        />
+      <Stack spacing="16px">
+        <SettingsSection title="Sign-in & navigation">
+          <SettingsToggleRow
+            storageKey={SESSION_KEEPER_KEY}
+            title="Keep me signed in"
+            description="Automatically signs you in when PESU Academy logs you out. "
+            onDisable={forgetStoredCredentials}
+          />
 
-        <SettingsEditRow
-          title="Appearance"
-          description="Change the way PESU Academy looks"
-          onClick={() => dispatch(setCurrentPage("appearance"))}
-          label="Open"
-        />
+          <SettingsToggleRow
+            storageKey={BACK_NAVIGATION_KEY}
+            title="Enable back button"
+            description="Back returns to your previous page instead of logging you out. persists on the next page load."
+          />
 
-        <SettingsToggleRow
-          storageKey={BACK_NAVIGATION_KEY}
-          title="Enable back button"
-          description="Back returns to your previous page instead of logging you out. persists on the next page load."
-        />
+          <SettingsSelectRow
+            storageKey={START_PAGE_KEY}
+            title="Set the start page"
+            description="Opens this page instead of Home after login"
+            options={START_PAGE_OPTIONS}
+          />
+        </SettingsSection>
 
-        <SettingsSelectRow
-          storageKey={START_PAGE_KEY}
-          title="Set the start page"
-          description="Opens this page instead of Home after login"
-          options={START_PAGE_OPTIONS}
-        />
+        <SettingsSection title="Display">
+          <SettingsEditRow
+            title="Appearance"
+            description="Change the way PESU Academy looks"
+            onClick={() => dispatch(setCurrentPage("appearance"))}
+            label="Open"
+          />
 
-        <SettingsEditRow
-          title="Re-order material types"
-          description="Move or hide the material columns of the Course Units table."
-          onClick={() => setMaterialColumnsOpen(true)}
-        />
+          <SettingsEditRow
+            title="Re-order material types"
+            description="Move or hide the material columns of the Course Units table."
+            onClick={() => setMaterialColumnsOpen(true)}
+          />
 
-        <SettingsToggleRow
-          storageKey={SIDE_MENU_DOCK_KEY}
-          title="Improved side menu"
-          description="Replaces the side menu with a dock of your sections and an All sections panel."
-        />
+          <SettingsSection title="Side menu" group>
+            <SettingsSelectRow
+              storageKey={SIDE_MENU_DOCK_KEY}
+              title="Side menu style"
+              description="Minimal swaps the side menu for a dock of your sections and an All sections panel."
+              options={SIDE_MENU_STYLE_OPTIONS}
+            />
 
-        <SettingsEditRow
-          title="Dock sections"
-          description="Pick the sections that sit in the dock."
-          onClick={() => setDockSectionsOpen(true)}
-          disabled={!dockOn}
-          label="Choose"
-        />
+            {dockOn && (
+              <SettingsEditRow
+                title="Dock sections"
+                description="Pick the sections that sit in the dock."
+                onClick={() => setDockSectionsOpen(true)}
+                label="Choose"
+              />
+            )}
 
-        {dock.ready && !dockOn && (
-          <Typography variant="body2" sx={settingsHintSx}>
-            Turn on the improved side menu to choose your sections.
-          </Typography>
-        )}
+            {classicOn && (
+              <SettingsEditRow
+                title="Re-order side menu"
+                description="Drag the side-menu into the order you want."
+                onClick={handleMenuEdit}
+                disabled={!canReorder || isEditing}
+                label={isEditing ? "Editing" : "Edit"}
+              />
+            )}
 
-        <SettingsEditRow
-          title="Re-order side menu"
-          description="Drag the side-menu into the order you want."
-          onClick={handleMenuEdit}
-          disabled={!canReorder || isEditing || dockOn}
-          label={isEditing ? "Editing" : "Edit"}
-        />
+            {classicOn && (
+              <SettingsToggleRow
+                storageKey={SIDE_MENU_STATE_KEY}
+                title="Keep side menu state"
+                description="Puts the side menu back the way you left it, collapsed or open."
+              />
+            )}
 
-        {dockOn && (
-          <Typography variant="body2" sx={settingsHintSx}>
-            Locked while the improved side menu is on.
-          </Typography>
-        )}
+            {classicOn && isEditing && (
+              <Typography variant="body2" sx={settingsHintSx}>
+                Edit mode is active on the page. Use Reset or the tick to lock the order in.
+              </Typography>
+            )}
 
-        <SettingsToggleRow
-          storageKey={SIDE_MENU_STATE_KEY}
-          title="Keep side menu state"
-          description="Puts the side menu back the way you left it, collapsed or open."
-          disabled={dockOn}
-        />
-
-        {dockOn && (
-          <Typography variant="body2" sx={settingsHintSx}>
-            Locked while the improved side menu is on.
-          </Typography>
-        )}
-
-        {isEditing && (
-          <Typography variant="body2" sx={settingsHintSx}>
-            Edit mode is active on the page. Use Reset or the tick to lock the order in.
-          </Typography>
-        )}
-
-        {!canReorder && !dockOn && (
-          <Typography variant="body2" sx={settingsWarningSx}>
-            Open your PESU Academy profile page to re-order the menu.
-          </Typography>
-        )}
+            {classicOn && !canReorder && (
+              <Typography variant="body2" sx={settingsWarningSx}>
+                Open your PESU Academy profile page to re-order the menu.
+              </Typography>
+            )}
+          </SettingsSection>
+        </SettingsSection>
       </Stack>
 
       <MaterialColumnsDialog

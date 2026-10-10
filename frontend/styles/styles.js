@@ -305,6 +305,29 @@ export const settingsActionButtonSx = {
   },
 };
 
+export const settingsSectionTitleSx = {
+  color: theme.colors.secondary,
+  fontWeight: 700,
+  fontSize: '12px',
+  letterSpacing: '0.6px',
+  textTransform: 'uppercase',
+  paddingLeft: '2px',
+};
+
+export const settingsGroupSx = {
+  padding: '8px',
+  border: `1.5px solid ${theme.colors.secondaryBorder}`,
+  borderRadius: '14px',
+  backgroundColor: theme.colors.secondaryLight,
+};
+
+export const settingsGroupTitleSx = {
+  color: theme.colors.secondary,
+  fontWeight: 600,
+  fontSize: '13px',
+  paddingLeft: '4px',
+};
+
 // Row hint and warning
 export const settingsHintSx = {
   color: theme.colors.secondary,
