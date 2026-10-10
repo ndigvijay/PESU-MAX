@@ -5,6 +5,7 @@ export const SIDE_MENU_COLLAPSED_KEY = "sideMenuCollapsed";
 export const SIDE_MENU_ORDER_KEY = "sideMenuOrder";
 export const SIDE_MENU_DOCK_KEY = "sideMenuDockEnabled";
 export const SIDE_MENU_DOCK_SECTIONS_KEY = "sideMenuDockSections";
+export const SIDE_MENU_SECTIONS_KEY = "sideMenuSections";
 export const COURSE_MATERIAL_COLUMNS_KEY = "courseMaterialColumns";
 export const START_PAGE_KEY = "startPage";
 export const BACK_NAVIGATION_KEY = "backNavigationEnabled";
