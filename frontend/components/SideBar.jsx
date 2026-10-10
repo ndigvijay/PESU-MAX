@@ -1,9 +1,10 @@
 import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { Drawer, Box, IconButton, Typography, Divider } from '@mui/material';
+import { Drawer, Box, IconButton, Typography, Divider, Badge } from '@mui/material';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 import { closeSidebar, openSidebar, setCurrentPage } from '../redux/sidebarSlice.js';
 import theme from '../Themes/theme.jsx';
+import { newBadgeSx } from '../styles/styles.js';
 import Home from '../Pages/Home.jsx';
 import CourseMaterial from '../Pages/CourseMaterial.jsx';
 import KnowYourFaculty from '../Pages/KnowYourFaculty.jsx';
@@ -92,7 +93,9 @@ const Sidebar = () => {
                     <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         <ResourceNotificationsButton />
                         <IconButton onClick={HandleSettings} aria-label="Open settings" size="large" sx={{ color: '#333' }}>
-                            <SettingsIcon fontSize="large" />
+                            <Badge badgeContent="NEW" overlap="circular" sx={newBadgeSx}>
+                                <SettingsIcon fontSize="large" />
+                            </Badge>
                         </IconButton>
                         <IconButton onClick={HandleClose} aria-label="Close PESU-MAX" size="large" sx={{ color: '#333' }}>
                             <ExitToAppIcon fontSize="large" />

@@ -111,7 +111,7 @@ const Settings = () => {
             onClick={() => setMaterialColumnsOpen(true)}
           />
 
-          <SettingsSection title="Side menu" group>
+          <SettingsSection title="Side menu" group isNew>
             <SettingsSelectRow
               storageKey={SIDE_MENU_DOCK_KEY}
               title="Side menu style"
