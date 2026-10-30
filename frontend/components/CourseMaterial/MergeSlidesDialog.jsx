@@ -18,11 +18,11 @@ import { DEFAULT_MERGE_SELECTION, MERGEABLE_CONTENT_TYPE_OPTIONS } from "../../c
 import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx } from "../../styles/styles.js";
 
 const MERGE_OPTION_DESCRIPTIONS = {
-  slides: "Create one merged PDF per subject inside the Slides folder.",
-  notes: "Create one merged PDF per subject inside the Notes folder.",
-  assignments: "Create one merged PDF per subject inside the Assignments folder.",
-  qb: "Create one merged PDF per subject inside the QB folder. Repeated unit files are included once.",
-  qa: "Create one merged PDF per subject inside the QA folder. Repeated unit files are included once."
+  slides: "Create one merged PDF per unit inside the Slides folder.",
+  notes: "Create one merged PDF per unit inside the Notes folder.",
+  assignments: "Create one merged PDF per unit inside the Assignments folder.",
+  qb: "Create one merged PDF per unit inside the QB folder. Repeated unit files are included once.",
+  qa: "Create one merged PDF per unit inside the QA folder. Repeated unit files are included once."
 };
 
 const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedContentTypes = [] }) => {
@@ -73,7 +73,7 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: theme.colors.textMuted, fontSize: "12px", lineHeight: 1.6 }}>
-          Choose which selected material types should be merged subject-wise into one PDF.
+          Choose which selected material types should be merged unit-wise into one PDF per unit.
         </Typography>
         <Typography variant="body2" sx={{ color: theme.colors.textSoft, fontSize: "11px", mt: 1 }}>
           PDF files are merged directly. PPT/PPTX and DOC/DOCX files are converted to PDF first. Unsupported files stay separate.

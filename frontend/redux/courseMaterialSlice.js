@@ -84,7 +84,7 @@ export const downloadSelectedMaterials = createAsyncThunk(
       dispatch(setDownloadProgress({
         current: 0,
         total: totalOperations,
-        currentItem: enabledMergeTypes.length > 0 ? 'Preparing subject-wise merges...' : 'Starting...',
+        currentItem: enabledMergeTypes.length > 0 ? 'Preparing unit-wise merges...' : 'Starting...',
         status: 'downloading'
       }));
 
