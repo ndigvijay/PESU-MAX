@@ -3,7 +3,7 @@ import { parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile, p
 import { save, load } from "../utils/storage.js";
 import { parallelBatch } from "../helpers/MiscControllers.js";
 import { probeSession } from "../helpers/academyAuth.js";
-import { checkCurrentSemesterResources, isResourceCheckDue, markResourceCheckStarted } from "./resourceCheck.js";
+import { checkCurrentSemesterResources, dedupeStoredResourceNotifications, isResourceCheckDue, markResourceCheckStarted } from "./resourceCheck.js";
 import {
   LIBRARY_PAPER_CHECK_ALARM,
   checkLibraryPaperLinks,
@@ -370,13 +370,17 @@ async function syncMissingData() {
       });
     }
 
-    if (!fetchLocks.resources && await isResourceCheckDue()) {
+    if (!fetchLocks.resources) {
       fetchLocks.resources = true;
-      await markResourceCheckStarted();
-      if (await probeSession()) {
-        checkCurrentSemesterResources()
-          .catch((err) => console.error("Error checking for new resources:", err))
-          .finally(() => { fetchLocks.resources = false; });
+      if (await isResourceCheckDue()) {
+        await markResourceCheckStarted();
+        if (await probeSession()) {
+          checkCurrentSemesterResources()
+            .catch((err) => console.error("Error checking for new resources:", err))
+            .finally(() => { fetchLocks.resources = false; });
+        } else {
+          fetchLocks.resources = false;
+        }
       } else {
         fetchLocks.resources = false;
       }
@@ -435,6 +439,7 @@ export function initializeDataSync() {
   });
 
   save(RESOURCE_CHECK_RUNNING_KEY, false);
+  dedupeStoredResourceNotifications();
 
   // Run immediately on load
   syncMissingData();

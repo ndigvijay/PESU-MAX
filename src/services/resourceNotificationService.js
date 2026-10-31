@@ -43,3 +43,25 @@ export const subscribeToResourceNotifications = (onChange) => {
   chrome.storage.onChanged.addListener(listener);
   return () => chrome.storage.onChanged.removeListener(listener);
 };
+
+export const downloadResourceNotification = (notification) => {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      {
+        action: "downloadResourceNotification",
+        notification
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        if (response?.error) {
+          reject(new Error(response.error));
+          return;
+        }
+        resolve(response);
+      }
+    );
+  });
+};

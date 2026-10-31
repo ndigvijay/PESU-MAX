@@ -1,7 +1,7 @@
 import { handleAcademySession } from "./academySession.js";
 import { load } from "../utils/storage.js";
 import { getPESUDataPagination, getAllPESUDataNested } from "../helpers/getStorageData.js";
-import { handleBulkDownload } from "../helpers/downloadController.js";
+import { handleBulkDownload, handleNotificationDownload } from "../helpers/downloadController.js";
 import { fetchAllPESUData, initializeDataSync } from "../initalizers/initialDataSave.js";
 import { getSemestersData } from "../helpers/MiscControllers.js";
 import { searchProfessors, getProfessorDetails } from "../services/pesuStaff.js";
@@ -91,6 +91,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sender,
       sendResponse
     );
+    return true;
+  }
+
+  if (request.action === "downloadResourceNotification") {
+    handleNotificationDownload(request.notification, sendResponse);
     return true;
   }
 

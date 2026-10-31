@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, createSelector } from "@reduxjs/toolkit";
 import {
+  downloadResourceNotification,
   getResourceNotifications,
   markResourceNotificationsRead
 } from "../../src/services/resourceNotificationService.js";
@@ -26,6 +27,17 @@ export const markNotificationsRead = createAsyncThunk(
   }
 );
 
+export const downloadNotificationResource = createAsyncThunk(
+  "notifications/downloadNotificationResource",
+  async (notification, { rejectWithValue }) => {
+    try {
+      return await downloadResourceNotification(notification);
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 const notificationsSlice = createSlice({
   name: "notifications",
   initialState: {
@@ -35,6 +47,7 @@ const notificationsSlice = createSlice({
     ready: false,
     loading: false,
     marking: false,
+    downloadingIds: {},
     error: null,
   },
   reducers: {},
@@ -66,6 +79,26 @@ const notificationsSlice = createSlice({
       .addCase(markNotificationsRead.rejected, (state) => {
         state.marking = false;
         state.error = "Could not mark as read. Please try again.";
+      })
+      .addCase(downloadNotificationResource.pending, (state, action) => {
+        const id = action.meta.arg?.id;
+        if (id) {
+          state.downloadingIds[id] = true;
+        }
+        state.error = null;
+      })
+      .addCase(downloadNotificationResource.fulfilled, (state, action) => {
+        const id = action.meta.arg?.id;
+        if (id) {
+          delete state.downloadingIds[id];
+        }
+      })
+      .addCase(downloadNotificationResource.rejected, (state, action) => {
+        const id = action.meta.arg?.id;
+        if (id) {
+          delete state.downloadingIds[id];
+        }
+        state.error = action.payload || "Could not download file. Please try again.";
       });
   },
 });
