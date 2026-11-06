@@ -103,6 +103,18 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 Converting PPT/PPTX and DOC/DOCX files to PDF might take some time, please wait.
               </Typography>
             )}
+            {downloadProgress.textPdfCount > 0 && (
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 0.5,
+                  color: theme.colors.secondary,
+                  fontSize: '11px'
+                }}
+              >
+                Text only topics found: {downloadProgress.textPdfCount}, saved as PDF
+              </Typography>
+            )}
           </Box>
         )}
 
@@ -126,6 +138,18 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                         </Box>
                       ))}
                     </Box>
+                  </Box>
+                )}
+                {downloadResult.stats?.textPdfCount > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
+                      {downloadResult.stats.textPdfCount} text only topic{downloadResult.stats.textPdfCount === 1 ? '' : 's'} saved as PDF
+                    </Typography>
+                    {downloadResult.stats.textHtmlFallbackCount > 0 && (
+                      <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
+                        {downloadResult.stats.textHtmlFallbackCount} text only topic{downloadResult.stats.textHtmlFallbackCount === 1 ? '' : 's'} saved as HTML because PDF creation failed
+                      </Typography>
+                    )}
                   </Box>
                 )}
                 {downloadResult.stats?.failed > 0 && (

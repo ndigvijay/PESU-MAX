@@ -432,3 +432,393 @@ export const parseUserProfile = (htmlData) => {
 
   return Object.keys(profile).length > 0 ? profile : null;
 };
+
+const SUPERSCRIPT_CHARS = {
+  '0': '\u2070', '1': '\u00b9', '2': '\u00b2', '3': '\u00b3', '4': '\u2074',
+  '5': '\u2075', '6': '\u2076', '7': '\u2077', '8': '\u2078', '9': '\u2079',
+  '+': '\u207a', '-': '\u207b', '=': '\u207c', '(': '\u207d', ')': '\u207e',
+  'n': '\u207f', 'i': '\u2071',
+};
+
+const SUBSCRIPT_CHARS = {
+  '0': '\u2080', '1': '\u2081', '2': '\u2082', '3': '\u2083', '4': '\u2084',
+  '5': '\u2085', '6': '\u2086', '7': '\u2087', '8': '\u2088', '9': '\u2089',
+  '+': '\u208a', '-': '\u208b', '=': '\u208c', '(': '\u208d', ')': '\u208e',
+};
+
+const MATH_ACCENTS = new Set(['\u00af', '^', '~', '\u2192', '\u02d9']);
+
+const normalizeMathText = (value) => String(value || '')
+  .replace(/\u00a0/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const scriptText = (value, charMap, marker) => {
+  const text = normalizeMathText(value);
+  if (!text) {
+    return '';
+  }
+
+  const chars = Array.from(text);
+  if (chars.every((char) => charMap[char])) {
+    return chars.map((char) => charMap[char]).join('');
+  }
+
+  return text.length === 1 ? `${marker}${text}` : `${marker}(${text})`;
+};
+
+const wrapMathOperand = (value) => (value.length > 1 ? `(${value})` : value);
+
+const mathMlToText = ($, element) => {
+  if (!element || element.type !== 'tag') {
+    return '';
+  }
+
+  const tag = element.tagName.toLowerCase();
+  const children = (element.children || []).filter((child) => child.type === 'tag');
+  const childText = () => children.map((child) => mathMlToText($, child)).join('');
+
+  switch (tag) {
+    case 'mi':
+    case 'mn':
+    case 'mo':
+    case 'mtext':
+    case 'ms':
+      return normalizeMathText($(element).text());
+    case 'mspace':
+      return ' ';
+    case 'mphantom':
+    case 'annotation':
+    case 'annotation-xml':
+      return '';
+    case 'semantics': {
+      const contentChild = children.find((child) => {
+        const childTag = child.tagName.toLowerCase();
+        return childTag !== 'annotation' && childTag !== 'annotation-xml';
+      });
+      return contentChild ? mathMlToText($, contentChild) : '';
+    }
+    case 'msup': {
+      const base = children[0] ? mathMlToText($, children[0]) : '';
+      const sup = children[1] ? mathMlToText($, children[1]) : '';
+      return `${base}${scriptText(sup, SUPERSCRIPT_CHARS, '^')}`;
+    }
+    case 'msub': {
+      const base = children[0] ? mathMlToText($, children[0]) : '';
+      const sub = children[1] ? mathMlToText($, children[1]) : '';
+      return `${base}${scriptText(sub, SUBSCRIPT_CHARS, '_')}`;
+    }
+    case 'msubsup': {
+      const base = children[0] ? mathMlToText($, children[0]) : '';
+      const sub = children[1] ? mathMlToText($, children[1]) : '';
+      const sup = children[2] ? mathMlToText($, children[2]) : '';
+      return `${base}${scriptText(sub, SUBSCRIPT_CHARS, '_')}${scriptText(sup, SUPERSCRIPT_CHARS, '^')}`;
+    }
+    case 'mfrac': {
+      const numerator = children[0] ? mathMlToText($, children[0]) : '';
+      const denominator = children[1] ? mathMlToText($, children[1]) : '';
+      return `${wrapMathOperand(numerator)}/${wrapMathOperand(denominator)}`;
+    }
+    case 'msqrt': {
+      const body = childText();
+      return body.length === 1 ? `\u221a${body}` : `\u221a(${body})`;
+    }
+    case 'mroot': {
+      const body = children[0] ? mathMlToText($, children[0]) : '';
+      const index = children[1] ? mathMlToText($, children[1]) : '';
+      const rootIndex = scriptText(index, SUPERSCRIPT_CHARS, '^');
+      return `${rootIndex}\u221a${body.length === 1 ? body : `(${body})`}`;
+    }
+    case 'munder':
+    case 'mover':
+    case 'munderover': {
+      const base = children[0] ? mathMlToText($, children[0]) : '';
+      const scripts = children.slice(1)
+        .map((child) => normalizeMathText(mathMlToText($, child)))
+        .filter(Boolean)
+        .map((script) => (MATH_ACCENTS.has(script) ? script : `(${script})`))
+        .join('');
+      return `${base}${scripts}`;
+    }
+    case 'mtable': {
+      const rows = children.filter((child) => child.tagName.toLowerCase() === 'mtr');
+      if (rows.length === 0) {
+        return children.map((child) => mathMlToText($, child)).join('; ');
+      }
+      return rows.map((row) => {
+        const cells = (row.children || [])
+          .filter((child) => child.type === 'tag' && child.tagName.toLowerCase() === 'mtd');
+        return cells.map((cell) => mathMlToText($, cell)).join(', ');
+      }).join('; ');
+    }
+    case 'mfenced': {
+      const open = $(element).attr('open');
+      const close = $(element).attr('close');
+      const separators = $(element).attr('separators');
+      const separator = separators == null || separators === '' ? ',' : separators[0];
+      return `${open == null ? '(' : open}${children.map((child) => mathMlToText($, child)).join(separator)}${close == null ? ')' : close}`;
+    }
+    default:
+      return childText();
+  }
+};
+
+const isTextContentImageSrc = (src) => {
+  if (!src) {
+    return false;
+  }
+
+  return /^data:image\/(png|jpe?g)[;,]/i.test(src)
+    || /^https?:\/\//i.test(src)
+    || src.startsWith('/Academy/');
+};
+
+const resolveTextContentImageSrc = (src) => {
+  if (!isTextContentImageSrc(src)) {
+    return null;
+  }
+
+  return src.startsWith('/Academy/') ? resolveDownloadUrl(src) : src;
+};
+
+const normalizeInlineText = (value) => String(value || '')
+  .replace(/\u00a0/g, ' ')
+  .replace(/[ \t\r\n]+/g, ' ');
+
+const mergeRun = (runs, run) => {
+  const previous = runs[runs.length - 1];
+  if (previous && previous.text && run.text && !previous.sup && !previous.sub
+    && !run.sup && !run.sub && Boolean(previous.bold) === Boolean(run.bold)) {
+    previous.text += run.text;
+    return;
+  }
+  runs.push(run);
+};
+
+const trimParagraphRuns = (runs) => {
+  const trimmed = runs.map((run) => ({ ...run }));
+
+  while (trimmed.length > 0 && trimmed[0].text && !trimmed[0].text.trim()) {
+    trimmed.shift();
+  }
+  if (trimmed.length > 0 && trimmed[0].text) {
+    trimmed[0].text = trimmed[0].text.replace(/^[ \t\r\n]+/, '');
+  }
+
+  while (trimmed.length > 0 && trimmed[trimmed.length - 1].text && !trimmed[trimmed.length - 1].text.trim()) {
+    trimmed.pop();
+  }
+  if (trimmed.length > 0 && trimmed[trimmed.length - 1].text) {
+    trimmed[trimmed.length - 1].text = trimmed[trimmed.length - 1].text.replace(/[ \t\r\n]+$/, '');
+  }
+
+  return trimmed.filter((run) => run.image || (run.text && run.text.length > 0));
+};
+
+export const parseTextContent = (htmlData) => {
+  if (!htmlData || typeof htmlData !== 'string' || !htmlData.trim()) {
+    return null;
+  }
+
+  const $ = load(htmlData);
+
+  $('script, style, iframe, .link-preview, [onclick*="loadIframe"]').remove();
+  $('.form-horizontal, .gutter-v').remove();
+  $('small').each((index, element) => {
+    if ($(element).text().trim().startsWith('Uploaded By')) {
+      $(element).remove();
+    }
+  });
+  $('*').contents().each((index, node) => {
+    if (node.type === 'comment') {
+      $(node).remove();
+    }
+  });
+  $('p').each((index, element) => {
+    if (!$(element).text().trim() && $(element).find('img, math').length === 0) {
+      $(element).remove();
+    }
+  });
+
+  const root = $('.content-type-area').first();
+  if (root.length === 0) {
+    return null;
+  }
+
+  const rootElement = root.get(0);
+  const titleElement = root.find('h4').first();
+  const title = titleElement.length > 0 ? normalizeMathText(titleElement.text()) : '';
+  if (titleElement.length > 0) {
+    titleElement.remove();
+  }
+
+  const blocks = [];
+  let runs = [];
+
+  const pushParagraph = (paragraphRuns) => {
+    const finalRuns = trimParagraphRuns(paragraphRuns);
+    if (finalRuns.some((run) => run.image || (run.text && run.text.trim()))) {
+      blocks.push({ type: 'paragraph', runs: finalRuns });
+    }
+  };
+
+  const flush = () => {
+    if (runs.length === 0) {
+      return;
+    }
+
+    let paragraphRuns = [];
+    for (const run of runs) {
+      if (run.image) {
+        pushParagraph(paragraphRuns);
+        paragraphRuns = [];
+        blocks.push({ type: 'image', src: run.image });
+        continue;
+      }
+      paragraphRuns.push(run);
+    }
+    pushParagraph(paragraphRuns);
+    runs = [];
+  };
+
+  const addRun = (run) => {
+    if (run.image || (run.text && run.text.length > 0)) {
+      mergeRun(runs, run);
+    }
+  };
+
+  const addText = (value, style = {}) => {
+    const text = normalizeInlineText(value);
+    if (text) {
+      addRun({ text, ...style });
+    }
+  };
+
+  const collectInline = (element, style = {}) => {
+    for (const child of element.children || []) {
+      if (child.type === 'text') {
+        addText(child.data, style);
+        continue;
+      }
+      if (child.type !== 'tag') {
+        continue;
+      }
+
+      const childTag = child.tagName.toLowerCase();
+      if (childTag === 'script' || childTag === 'style') {
+        continue;
+      }
+      if (childTag === 'small' && $(child).text().trim().startsWith('Uploaded By')) {
+        continue;
+      }
+      if (childTag === 'br') {
+        addRun({ text: '\n' });
+        continue;
+      }
+      if (childTag === 'img') {
+        const src = resolveTextContentImageSrc($(child).attr('src'));
+        if (src) {
+          addRun({ image: src });
+        }
+        continue;
+      }
+      if (childTag === 'math') {
+        const mathText = mathMlToText($, child);
+        if (mathText) {
+          addRun({ text: mathText, ...style });
+        }
+        continue;
+      }
+
+      const nextStyle = { ...style };
+      if (childTag === 'strong' || childTag === 'b') {
+        nextStyle.bold = true;
+      }
+      if (childTag === 'sup') {
+        nextStyle.sup = true;
+      }
+      if (childTag === 'sub') {
+        nextStyle.sub = true;
+      }
+      collectInline(child, nextStyle);
+    }
+  };
+
+  const blockTags = new Set(['p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'ul', 'ol', 'blockquote', 'section', 'article', 'pre']);
+
+  const walk = (element) => {
+    for (const child of element.children || []) {
+      if (child.type === 'text') {
+        addText(child.data);
+        continue;
+      }
+      if (child.type !== 'tag') {
+        continue;
+      }
+
+      const childTag = child.tagName.toLowerCase();
+      if (childTag === 'script' || childTag === 'style' || childTag === 'iframe') {
+        continue;
+      }
+      if ($(child).is('.content-type-area') && child !== rootElement) {
+        flush();
+        walk(child);
+        continue;
+      }
+      if (childTag === 'img') {
+        flush();
+        const src = resolveTextContentImageSrc($(child).attr('src'));
+        if (src) {
+          blocks.push({ type: 'image', src });
+        }
+        continue;
+      }
+      if (childTag === 'br') {
+        addRun({ text: '\n' });
+        continue;
+      }
+      if (childTag === 'math') {
+        const mathText = mathMlToText($, child);
+        if (mathText) {
+          addRun({ text: mathText });
+        }
+        continue;
+      }
+      if (blockTags.has(childTag)) {
+        const hasNestedBlock = Array.from(child.children || []).some((grandChild) => (
+          grandChild.type === 'tag'
+          && (blockTags.has(grandChild.tagName.toLowerCase()) || $(grandChild).is('.content-type-area'))
+        ));
+
+        if (hasNestedBlock) {
+          flush();
+          walk(child);
+          continue;
+        }
+
+        flush();
+        if (childTag === 'li') {
+          addRun({ text: '\u2022 ' });
+        }
+        const style = /^h[1-6]$/.test(childTag) ? { bold: true } : {};
+        collectInline(child, style);
+        flush();
+        continue;
+      }
+
+      collectInline(child);
+    }
+  };
+
+  walk(rootElement);
+  flush();
+
+  const hasMeaningfulContent = blocks.some((block) => block.type === 'image'
+    || (block.runs || []).some((run) => run.text && run.text.trim()));
+
+  if (!hasMeaningfulContent) {
+    return null;
+  }
+
+  return { title: title || null, blocks };
+};

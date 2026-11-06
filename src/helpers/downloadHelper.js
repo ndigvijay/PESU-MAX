@@ -14,6 +14,7 @@ import { convertMultipleOfficeBlobsToPdfWithILovePdf, isOfficeConvertibleExtensi
 import { load } from '../utils/storage.js';
 import { RESOURCES_KEY } from '../utils/storageKeys.js';
 import { DEFAULT_MERGE_MODE, MERGE_MODES, normalizeMergeMode } from './mergeModes.js';
+import { createTextContentFile } from './textContentPdf.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -360,6 +361,17 @@ function formatErrorMessage(error, fallbackMessage = 'Unknown error') {
   return fallbackMessage;
 }
 
+function formatTopicErrorMessage(error) {
+  const message = formatErrorMessage(error, 'Unknown error occurred');
+  const statusMatch = message.match(/Failed to (?:fetch|load) course materials?(?: view)?:?\s*(\d{3})/i);
+
+  if (statusMatch) {
+    return `PESU Academy returned an error for this topic (HTTP ${statusMatch[1]}).`;
+  }
+
+  return message;
+}
+
 async function addFileToZip(zip, filePath, blob, extension) {
   const arrayBuffer = await blob.arrayBuffer();
   const useStore = isAlreadyCompressedExt(extension);
@@ -476,7 +488,15 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
       // Parse HTML to get download links
       const downloadLinks = parseDownloadLinks(result.data);
       if (downloadLinks.length === 0) {
-        return [{ success: false, error: 'No download links found in HTML' }];
+        const textFile = await createTextContentFile(result.data, {
+          name: CONTENT_TYPE_NAMES[contentType] || 'PESU_Material'
+        });
+
+        if (textFile) {
+          return [textFile];
+        }
+
+        return [{ success: false, error: 'No files or text content found for this topic.' }];
       }
 
       const downloadPromises = downloadLinks.map(async (link) => {
@@ -513,7 +533,7 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
     }
 
     console.error(`Failed to get material for class ${classId}:`, error);
-    return [{ success: false, error: error.message || 'Unknown error occurred' }];
+    return [{ success: false, error: formatTopicErrorMessage(error) }];
   }
 }
 
@@ -559,6 +579,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     }
   }
 
+  let textPdfCount = 0;
+  let textHtmlFallbackCount = 0;
+
   const results = await parallelBatch(downloadTasks, async (task) => {
     const { item, contentType } = task;
     const { subjectId, unitId, classId, classNo, className } = item;
@@ -566,13 +589,26 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
     try {
       const filesArray = await getClassMaterialFile(subjectId, unitId, classId, classNo, contentType);
+      const textFile = Array.isArray(filesArray) ? filesArray.find((file) => file?.fromText) : null;
+      if (textFile) {
+        if (textFile.textFallback) {
+          textHtmlFallbackCount++;
+        } else {
+          textPdfCount++;
+        }
+      }
+
       completed++;
       if (progressCallback) {
         progressCallback({
           current: completed,
           total: totalOperations,
-          currentItem: `${className} (${contentTypeName})`,
-          status: 'downloading'
+          currentItem: textFile
+            ? `${className} (${contentTypeName}): saved text as ${textFile.textFallback ? 'HTML' : 'PDF'}`
+            : `${className} (${contentTypeName})`,
+          status: 'downloading',
+          textPdfCount,
+          textHtmlFallbackCount
         });
       }
       return { item, contentType, filesArray };
@@ -587,7 +623,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           current: completed,
           total: totalOperations,
           currentItem: `${className} (${contentTypeName})`,
-          status: 'downloading'
+          status: 'downloading',
+          textPdfCount,
+          textHtmlFallbackCount
         });
       }
       return { item, contentType, filesArray: [{ success: false, error: error.message }] };
@@ -947,6 +985,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       mergeMode: normalizedMergeMode,
       duplicateSourceFilesByType,
       totalMergedFiles,
+      textPdfCount,
+      ...(textHtmlFallbackCount > 0 ? { textHtmlFallbackCount } : {}),
       contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)
     }
   };
