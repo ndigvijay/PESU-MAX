@@ -34,7 +34,7 @@ export const fetchSemesters = createAsyncThunk(
 
 export const downloadSelectedMaterials = createAsyncThunk(
   "courseMaterial/downloadSelectedMaterials",
-  async ({ contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION }, { getState, dispatch, rejectWithValue }) => {
+  async ({ contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION, mergeMode = "subject-wise" }, { getState, dispatch, rejectWithValue }) => {
     try {
 
       const allData = await fetchAllPesuData();
@@ -76,15 +76,17 @@ export const downloadSelectedMaterials = createAsyncThunk(
       const enabledMergeTypes = MERGEABLE_CONTENT_TYPE_OPTIONS.filter((option) =>
         contentTypes.includes(option.id) && normalizedMergeOptions[option.key]
       );
-      const mergeSubjectCount = enabledMergeTypes.length > 0
-        ? new Set(selectedItems.map((item) => item.subjectId)).size * enabledMergeTypes.length
+      const mergeGroupCount = enabledMergeTypes.length > 0
+        ? new Set(selectedItems.map((item) => mergeMode === "unit-wise"
+          ? `${item.subjectId}:${item.unitId}`
+          : item.subjectId)).size * enabledMergeTypes.length
         : 0;
-      const totalOperations = (selectedItems.length * contentTypes.length) + mergeSubjectCount;
+      const totalOperations = (selectedItems.length * contentTypes.length) + mergeGroupCount;
 
       dispatch(setDownloadProgress({
         current: 0,
         total: totalOperations,
-        currentItem: enabledMergeTypes.length > 0 ? 'Preparing unit-wise merges...' : 'Starting...',
+        currentItem: enabledMergeTypes.length > 0 ? `Preparing ${mergeMode} merges...` : 'Starting...',
         status: 'downloading'
       }));
 
@@ -92,6 +94,7 @@ export const downloadSelectedMaterials = createAsyncThunk(
         selectedItems,
         contentTypes,
         normalizedMergeOptions,
+        mergeMode,
         (progress) => dispatch(setDownloadProgress(progress))
       );
 

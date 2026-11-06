@@ -28,6 +28,10 @@ import {
   DEFAULT_MERGE_SELECTION,
   MERGEABLE_CONTENT_TYPE_OPTIONS
 } from "../constants/constants.js";
+import useStoredSetting from "../components/Settings/useStoredSetting.js";
+import { MERGE_MODE_KEY } from "../../src/utils/storageKeys.js";
+
+const DEFAULT_MERGE_MODE = "subject-wise";
 
 const CourseMaterial = () => {
   const dispatch = useDispatch();
@@ -38,6 +42,8 @@ const CourseMaterial = () => {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [pendingContentTypes, setPendingContentTypes] = useState([]);
   const [contentTypeSelectionState, setContentTypeSelectionState] = useState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
+  const mergeModeSetting = useStoredSetting(MERGE_MODE_KEY, DEFAULT_MERGE_MODE, "Merge Slides");
+  const mergeMode = mergeModeSetting.value === "unit-wise" ? "unit-wise" : DEFAULT_MERGE_MODE;
   
   // Redux state
   const { search, semester, page, rowsPerPage, downloading } = useSelector(
@@ -77,10 +83,18 @@ const CourseMaterial = () => {
     setContentTypeDialogOpen(true);
   };
 
-  const startDownload = (contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION) => {
+  const startDownload = (
+    contentTypes,
+    mergeOptions = DEFAULT_MERGE_SELECTION,
+    selectedMergeMode = mergeMode
+  ) => {
     if (contentTypes.length > 0) {
       setDownloadDialogOpen(true);
-      dispatch(downloadSelectedMaterials({ contentTypes, mergeOptions }));
+      dispatch(downloadSelectedMaterials({
+        contentTypes,
+        mergeOptions,
+        mergeMode: selectedMergeMode
+      }));
     }
   };
 
@@ -107,12 +121,12 @@ const CourseMaterial = () => {
     startDownload(contentTypes, DEFAULT_MERGE_SELECTION);
   };
 
-  const handleMergeSlidesConfirm = (mergeOptions) => {
+  const handleMergeSlidesConfirm = (mergeOptions, selectedMergeMode) => {
     const contentTypes = pendingContentTypes;
     setMergeOptionsDialogOpen(false);
     setPendingContentTypes([]);
     setContentTypeSelectionState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
-    startDownload(contentTypes, mergeOptions);
+    startDownload(contentTypes, mergeOptions, selectedMergeMode);
   };
 
   const handleMergeSlidesBack = () => {
@@ -161,6 +175,7 @@ const CourseMaterial = () => {
         onBack={handleMergeSlidesBack}
         onConfirm={handleMergeSlidesConfirm}
         selectedContentTypes={pendingContentTypes}
+        mergeMode={mergeMode}
       />
 
       <DownloadProgressDialog

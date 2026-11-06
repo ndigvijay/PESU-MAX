@@ -100,7 +100,7 @@ function getFileExtension(response, fallback = '.pdf') {
 
 // Sanitize filename for filesystem
 function sanitizeFilename(name) {
-  return name
+  return String(name || 'file')
     .replace(/[<>:"/\\|?*]/g, '_')
     .replace(/\s+/g, '_')
     .substring(0, 100);
@@ -322,17 +322,22 @@ function getEnabledMergeContentTypes(contentTypes, mergeOptions = {}, mergeSlide
   );
 }
 
-function buildSubjectMergeGroupKey(subjectId, unitId, contentType) {
-  return `${subjectId}:${unitId}:${contentType}`;
+function buildMergeGroupKey(subjectId, unitId, contentType, mergeMode) {
+  return mergeMode === 'unit-wise'
+    ? `${subjectId}:${unitId}:${contentType}`
+    : `${subjectId}:${contentType}`;
 }
 
-function buildMergedContentFilePath(subjectName, subjectCode, unitName, contentTypeName) {
+function buildMergedContentFilePath(subjectName, subjectCode, unitName, contentTypeName, mergeMode) {
   const safeFolderName = sanitizeFilename(subjectName);
   const safeContentFolder = sanitizeFilename(contentTypeName);
-  const safeUnitName = sanitizeFilename(unitName);
-  const mergedFileName = subjectCode
-    ? `${sanitizeFilename(subjectCode)}_${safeUnitName}_Merged_${safeContentFolder}.pdf`
-    : `${safeUnitName}_Merged_${safeContentFolder}.pdf`;
+  const mergedFileName = mergeMode === 'unit-wise'
+    ? (subjectCode
+      ? `${sanitizeFilename(subjectCode)}_${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`
+      : `${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`)
+    : (subjectCode
+      ? `${sanitizeFilename(subjectCode)}_Merged_${safeContentFolder}.pdf`
+      : `${safeFolderName}_Merged_${safeContentFolder}.pdf`);
 
   return `${safeFolderName}/${safeContentFolder}/${mergedFileName}`;
 }
@@ -508,7 +513,8 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
 }
 
 export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2], options = {}) {
-  const { mergeOptions = {}, mergeSlides = false } = options;
+  const { mergeOptions = {}, mergeSlides = false, mergeMode = 'subject-wise' } = options;
+  const normalizedMergeMode = mergeMode === 'unit-wise' ? 'unit-wise' : 'subject-wise';
   const zip = new JSZip();
   const normalizedMergeOptions = normalizeMergeOptions(mergeOptions, mergeSlides);
   const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, normalizedMergeOptions);
@@ -518,15 +524,15 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
   if (enabledMergeContentTypes.length > 0) {
     for (const item of selectedItems) {
       for (const mergeContentType of enabledMergeContentTypes) {
-        const groupKey = buildSubjectMergeGroupKey(item.subjectId, item.unitId, mergeContentType.id);
+        const groupKey = buildMergeGroupKey(item.subjectId, item.unitId, mergeContentType.id, normalizedMergeMode);
 
         if (!subjectMergeGroups.has(groupKey)) {
           subjectMergeGroups.set(groupKey, {
             subjectId: item.subjectId,
             subjectCode: item.subjectCode,
             subjectName: item.subjectName,
-            unitId: item.unitId,
-            unitName: item.unitName,
+            unitId: normalizedMergeMode === 'unit-wise' ? item.unitId : null,
+            unitName: normalizedMergeMode === 'unit-wise' ? item.unitName : null,
             contentType: mergeContentType.id,
             contentTypeName: mergeContentType.name,
             files: []
@@ -658,7 +664,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           && isOfficeConvertibleExtension(resolvedExtension);
 
         if (isMergeablePdf || isMergeableOffice) {
-          const mergeGroupKey = buildSubjectMergeGroupKey(subjectId, item.unitId, contentType);
+          const mergeGroupKey = buildMergeGroupKey(subjectId, item.unitId, contentType, normalizedMergeMode);
 
           subjectMergeGroups.get(mergeGroupKey)?.files.push({
             item,
@@ -867,7 +873,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           subjectGroup.subjectName,
           subjectGroup.subjectCode,
           subjectGroup.unitName,
-          subjectGroup.contentTypeName
+          subjectGroup.contentTypeName,
+          normalizedMergeMode
         );
         await addFileToZip(zip, mergedFilePath, mergeResult.blob, '.pdf');
         totalFiles++;
@@ -931,6 +938,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       mergedSlideSources,
       mergedSubjectsByType,
       mergedSourceFilesByType,
+      mergeMode: normalizedMergeMode,
       duplicateSourceFilesByType,
       totalMergedFiles,
       contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)

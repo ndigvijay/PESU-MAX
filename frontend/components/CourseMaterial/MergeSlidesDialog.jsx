@@ -8,14 +8,16 @@ import {
   Button,
   Box,
   IconButton,
-  Checkbox
+  Checkbox,
+  MenuItem,
+  Select
 } from "@mui/material";
 import MergeTypeIcon from "@mui/icons-material/MergeType";
 import DownloadIcon from "@mui/icons-material/Download";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import theme from "../../Themes/theme.jsx";
 import { DEFAULT_MERGE_SELECTION, MERGEABLE_CONTENT_TYPE_OPTIONS } from "../../constants/constants.js";
-import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx } from "../../styles/styles.js";
+import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx, selectSx } from "../../styles/styles.js";
 
 const MERGE_OPTION_DESCRIPTIONS = {
   slides: "Create one merged PDF per unit inside the Slides folder.",
@@ -25,8 +27,14 @@ const MERGE_OPTION_DESCRIPTIONS = {
   qa: "Create one merged PDF per unit inside the QA folder. Repeated unit files are included once."
 };
 
-const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedContentTypes = [] }) => {
+const MERGE_MODE_OPTIONS = [
+  { value: "subject-wise", label: "Subject-wise" },
+  { value: "unit-wise", label: "Unit-wise" }
+];
+
+const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedContentTypes = [], mergeMode = "subject-wise" }) => {
   const [selectedMergeTypes, setSelectedMergeTypes] = useState(DEFAULT_MERGE_SELECTION);
+  const [selectedMergeMode, setSelectedMergeMode] = useState(mergeMode);
 
   const availableMergeOptions = useMemo(
     () => MERGEABLE_CONTENT_TYPE_OPTIONS.filter((option) => selectedContentTypes.includes(option.id)),
@@ -36,8 +44,9 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
   useEffect(() => {
     if (open) {
       setSelectedMergeTypes({ ...DEFAULT_MERGE_SELECTION });
+      setSelectedMergeMode(mergeMode);
     }
-  }, [open, selectedContentTypes]);
+  }, [open, selectedContentTypes, mergeMode]);
 
   const selectedMergeCount = availableMergeOptions.filter((option) => selectedMergeTypes[option.key]).length;
 
@@ -73,11 +82,30 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: theme.colors.textMuted, fontSize: "12px", lineHeight: 1.6 }}>
-          Choose which selected material types should be merged unit-wise into one PDF per unit.
+          Choose which selected material types should be merged {selectedMergeMode} into one PDF per {selectedMergeMode === "unit-wise" ? "unit" : "subject"}.
         </Typography>
         <Typography variant="body2" sx={{ color: theme.colors.textSoft, fontSize: "11px", mt: 1 }}>
           PDF files are merged directly. PPT/PPTX and DOC/DOCX files are converted to PDF first. Unsupported files stay separate.
         </Typography>
+
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mt: 2 }}>
+          <Typography sx={{ color: theme.colors.secondary, fontSize: "12px", fontWeight: 600 }}>
+            Merge mode
+          </Typography>
+          <Select
+            value={selectedMergeMode}
+            onChange={(event) => setSelectedMergeMode(event.target.value)}
+            size="small"
+            sx={{ ...selectSx, minWidth: "140px" }}
+            slotProps={{ input: { "aria-label": "Merge mode" } }}
+          >
+            {MERGE_MODE_OPTIONS.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </Box>
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, mt: 2 }}>
           {availableMergeOptions.map((option) => {
@@ -131,7 +159,7 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
       <DialogActions sx={{ padding: "8px 24px 16px", gap: 1 }}>
         <Button
           variant="contained"
-          onClick={() => onConfirm({ ...DEFAULT_MERGE_SELECTION })}
+          onClick={() => onConfirm({ ...DEFAULT_MERGE_SELECTION }, selectedMergeMode)}
           disabled={selectedMergeCount > 0}
           sx={secondaryButtonSx}
         >
@@ -139,7 +167,7 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
         </Button>
         <Button
           variant="contained"
-          onClick={() => onConfirm(selectedMergeTypes)}
+          onClick={() => onConfirm(selectedMergeTypes, selectedMergeMode)}
           startIcon={selectedMergeCount > 0 ? <MergeTypeIcon /> : <DownloadIcon />}
           sx={primaryButtonSx}
         >

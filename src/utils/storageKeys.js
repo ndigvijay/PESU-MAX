@@ -9,6 +9,7 @@ export const SIDE_MENU_SECTIONS_KEY = "sideMenuSections";
 export const COURSE_MATERIAL_COLUMNS_KEY = "courseMaterialColumns";
 export const START_PAGE_KEY = "startPage";
 export const BACK_NAVIGATION_KEY = "backNavigationEnabled";
+export const MERGE_MODE_KEY = "mergeMode";
 export const THEME_PALETTE_KEY = "themePalette";
 export const THEME_FONT_KEY = "themeFont";
 export const THEME_DARK_KEY = "themeDarkMode";

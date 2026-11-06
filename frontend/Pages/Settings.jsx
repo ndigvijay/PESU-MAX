@@ -21,6 +21,7 @@ import { START_PAGE_OPTIONS } from "../../src/content/startPage";
 import {
   ACADEMY_CREDENTIAL_KEY,
   BACK_NAVIGATION_KEY,
+  MERGE_MODE_KEY,
   SESSION_KEEPER_KEY,
   SIDE_MENU_DOCK_KEY,
   SIDE_MENU_STATE_KEY,
@@ -31,6 +32,11 @@ import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js
 const SIDE_MENU_STYLE_OPTIONS = [
   { value: false, label: "Classic" },
   { value: true, label: "Minimal" },
+];
+
+const MERGE_MODE_OPTIONS = [
+  { value: "subject-wise", label: "Subject-wise" },
+  { value: "unit-wise", label: "Unit-wise" },
 ];
 
 const Settings = () => {
@@ -61,7 +67,13 @@ const Settings = () => {
   };
 
   return (
-    <Box sx={{ padding: "12px", boxSizing: "border-box", maxHeight: "100vh", overflowY: "auto" }}>
+    <Box sx={{
+      padding: "12px",
+      boxSizing: "border-box",
+      height: "100%",
+      minHeight: 0,
+      overflowY: "auto",
+    }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
         <IconButton
           onClick={handleBack}
@@ -169,6 +181,15 @@ const Settings = () => {
               </Typography>
             )}
           </SettingsSection>
+        </SettingsSection>
+
+        <SettingsSection title="Advanced">
+          <SettingsSelectRow
+            storageKey={MERGE_MODE_KEY}
+            title="Merge Slides"
+            description="Choose whether selected materials are merged unit-wise or subject-wise."
+            options={MERGE_MODE_OPTIONS}
+          />
         </SettingsSection>
       </Stack>
 
