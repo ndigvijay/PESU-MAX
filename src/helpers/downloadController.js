@@ -1,4 +1,4 @@
-import { createBulkDownloadZip } from './downloadHelper.js';
+import { createBulkDownloadZip, downloadNotificationFiles } from './downloadHelper.js';
 import { blobToDataUrl } from './blobEncoding.js';
 import { CONTENT_TYPE_IDS } from './pesuAPI.js';
 
@@ -76,5 +76,52 @@ export async function handleBulkDownload(selectedItems, contentTypes, mergeOptio
         port.disconnect();
       } catch (e) {}
     }
+  }
+}
+
+
+function triggerChromeDownload(url, filename) {
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download(
+      {
+        url,
+        filename,
+        saveAs: false
+      },
+      (downloadId) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(downloadId);
+      }
+    );
+  });
+}
+
+export async function handleNotificationDownload(notification, sendResponse) {
+  if (!notification) {
+    sendResponse({ error: "No notification provided" });
+    return;
+  }
+
+  try {
+    const files = await downloadNotificationFiles(notification);
+    const downloadIds = [];
+
+    for (const file of files) {
+      const dataUrl = await blobToDataUrl(file.blob, file.mimeType || 'application/octet-stream');
+      const downloadId = await triggerChromeDownload(dataUrl, file.filename);
+      downloadIds.push(downloadId);
+    }
+
+    sendResponse({
+      success: true,
+      downloadedCount: downloadIds.length,
+      downloadIds
+    });
+  } catch (error) {
+    console.error("Notification download error:", error);
+    sendResponse({ error: error.message || "Could not download file" });
   }
 }

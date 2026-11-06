@@ -7,6 +7,7 @@ import { setCurrentPage } from "../redux/sidebarSlice.js";
 import theme from "../Themes/theme.jsx";
 import ResourceNotificationRow from "../components/Notifications/ResourceNotificationRow.jsx";
 import {
+  downloadNotificationResource,
   markNotificationsRead,
   selectReadIdSet,
   selectUnreadCount,
@@ -42,7 +43,9 @@ const groupByCourseAndUnit = (notifications) => {
 
 const Notifications = () => {
   const dispatch = useDispatch();
-  const { items: notifications, ready, error, marking, checking } = useSelector((state) => state.notifications);
+  const { items: notifications, ready, error, marking, checking, downloadingIds } = useSelector(
+    (state) => state.notifications
+  );
   const readIdSet = useSelector(selectReadIdSet);
   const unreadCount = useSelector(selectUnreadCount);
   const groups = useMemo(() => groupByCourseAndUnit(notifications), [notifications]);
@@ -122,7 +125,9 @@ const Notifications = () => {
                       notification={notification}
                       read={readIdSet.has(notification.id)}
                       disabled={marking}
+                      downloading={Boolean(downloadingIds?.[notification.id])}
                       onMarkRead={(id) => dispatch(markNotificationsRead([id]))}
+                      onDownload={(item) => dispatch(downloadNotificationResource(item))}
                     />
                   ))}
                 </Stack>

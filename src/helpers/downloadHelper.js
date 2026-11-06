@@ -3,13 +3,16 @@ import { PDFDocument } from 'pdf-lib';
 import {
   fetchPesu,
   getCourseMaterials,
+  getUnitClasses,
   CONTENT_TYPE_NAMES,
   CONTENT_TYPE_IDS,
   isPesuSessionExpiredError
 } from './pesuAPI.js';
-import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
+import { parseDownloadLinks, parseUnitClasses, resolveDownloadUrl } from './parser.js';
 import { parallelBatch } from './MiscControllers.js';
 import { convertMultipleOfficeBlobsToPdfWithILovePdf, isOfficeConvertibleExtension } from './ilovepdfHelper.js';
+import { load } from '../utils/storage.js';
+import { RESOURCES_KEY } from '../utils/storageKeys.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -976,4 +979,296 @@ export function downloadBlob(blob, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+
+const EXTENSION_TO_CONTENT_TYPE = Object.entries(CONTENT_TYPE_TO_EXT).reduce((acc, [mime, ext]) => {
+  if (!acc[ext]) {
+    acc[ext] = mime;
+  }
+  return acc;
+}, {});
+
+function normalizeMatchText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function getExtensionFromContentType(contentType = '', fallback = '.pdf') {
+  for (const [type, ext] of Object.entries(CONTENT_TYPE_TO_EXT)) {
+    if (contentType.includes(type)) {
+      return ext;
+    }
+  }
+  return fallback;
+}
+
+function buildNotificationDownloadFilename(rawName, extension) {
+  const normalizedExt = normalizeExtension(extension) || '.pdf';
+  let baseName = String(rawName || 'PESU_Material').trim();
+  if (baseName.toLowerCase().endsWith(normalizedExt.toLowerCase())) {
+    baseName = baseName.slice(0, -normalizedExt.length);
+  }
+  const safeBase = sanitizeFilename(baseName) || 'PESU_Material';
+  return `${safeBase}${normalizedExt}`;
+}
+
+function findMatchingDownloadLink(downloadLinks, targetItem, usedUrls = new Set()) {
+  if (!Array.isArray(downloadLinks) || downloadLinks.length === 0) {
+    return null;
+  }
+
+  const targetDocId = String(targetItem?.docId || '').trim();
+  const targetName = normalizeMatchText(targetItem?.name);
+
+  if (targetDocId) {
+    const byDocId = downloadLinks.find(
+      (link) => String(link.docId || '').trim() === targetDocId || String(link.url || '').includes(targetDocId)
+    );
+    if (byDocId) {
+      return byDocId;
+    }
+  }
+
+  if (targetName) {
+    const byExactName = downloadLinks.find(
+      (link) => !usedUrls.has(link.url) && normalizeMatchText(link.name) === targetName
+    ) || downloadLinks.find(
+      (link) => normalizeMatchText(link.name) === targetName
+    );
+    if (byExactName) {
+      return byExactName;
+    }
+
+    const byPartialName = downloadLinks.find((link) => {
+      const linkName = normalizeMatchText(link.name);
+      return linkName && (linkName.includes(targetName) || targetName.includes(linkName));
+    });
+    if (byPartialName) {
+      return byPartialName;
+    }
+  }
+
+  if (downloadLinks.length === 1) {
+    return downloadLinks[0];
+  }
+
+  return null;
+}
+
+async function prepareDownloadedFile(blob, reportedExtension, rawName) {
+  const normalizedReportedExt = normalizeExtension(reportedExtension) || '.pdf';
+  const inspection = await inspectBlobFileType(blob, normalizedReportedExt);
+  const resolvedExtension = inspection.resolvedExtension || normalizedReportedExt;
+  const mimeType = EXTENSION_TO_CONTENT_TYPE[resolvedExtension] || blob.type || 'application/octet-stream';
+  const filename = buildNotificationDownloadFilename(rawName, resolvedExtension);
+
+  return {
+    blob,
+    filename,
+    mimeType
+  };
+}
+
+export async function downloadNotificationFiles(notification) {
+  const subjectId = String(notification?.subjectId || '').trim();
+  const unitId = String(notification?.unitId || '').trim();
+  let resolvedClassId = String(notification?.classId || '').trim();
+  const className = notification?.className || '';
+  const resources = Array.isArray(notification?.resources) ? notification.resources : [];
+
+  if (!subjectId || !unitId || resources.length === 0) {
+    throw new Error('Notification is missing resource information.');
+  }
+
+  let resolvedClassNo = notification?.classNo != null && String(notification.classNo).trim() !== ''
+    ? String(notification.classNo).trim()
+    : null;
+
+  if (!resolvedClassNo) {
+    const [storedResources, storedPesuData] = await Promise.all([
+      load(RESOURCES_KEY).catch(() => null),
+      load('pesuData').catch(() => null)
+    ]);
+
+    const resourceClass = storedResources?.subjects?.[subjectId]?.units?.[unitId]?.classes?.[resolvedClassId];
+    if (resourceClass?.classNo != null && String(resourceClass.classNo).trim() !== '') {
+      resolvedClassNo = String(resourceClass.classNo).trim();
+    }
+
+    if (!resolvedClassNo) {
+      const unitClasses = storedPesuData?.subjects?.[subjectId]?.units?.[unitId]?.classes || [];
+      const matchedClass = unitClasses.find(
+        (cls) => String(cls.id) === resolvedClassId
+      ) || unitClasses.find(
+        (cls) => className && normalizeMatchText(cls.className) === normalizeMatchText(className)
+      );
+
+      if (matchedClass) {
+        if (!resolvedClassId && matchedClass.id != null) {
+          resolvedClassId = String(matchedClass.id);
+        }
+        if (matchedClass.classNo != null && String(matchedClass.classNo).trim() !== '') {
+          resolvedClassNo = String(matchedClass.classNo).trim();
+        }
+      }
+    }
+  }
+
+  let cachedUnitClasses = null;
+  const fetchUnitClassList = async () => {
+    if (cachedUnitClasses !== null) {
+      return cachedUnitClasses;
+    }
+    try {
+      const classesHtml = await getUnitClasses(subjectId, unitId);
+      cachedUnitClasses = classesHtml ? parseUnitClasses(classesHtml) : [];
+    } catch {
+      cachedUnitClasses = [];
+    }
+    return cachedUnitClasses;
+  };
+
+  if (!resolvedClassNo || !resolvedClassId) {
+    const unitClasses = await fetchUnitClassList();
+    const matchedClass = unitClasses.find(
+      (cls) => resolvedClassId && String(cls.id) === resolvedClassId
+    ) || unitClasses.find(
+      (cls) => className && normalizeMatchText(cls.className) === normalizeMatchText(className)
+    );
+
+    if (matchedClass) {
+      resolvedClassId = String(matchedClass.id);
+      if (matchedClass.classNo != null && String(matchedClass.classNo).trim() !== '') {
+        resolvedClassNo = String(matchedClass.classNo).trim();
+      }
+    }
+  }
+
+  const classNoToUse = resolvedClassNo || '1';
+  const downloadedFiles = [];
+
+  for (const resource of resources) {
+    const contentType = Number(resource.type) || CONTENT_TYPE_IDS.slides;
+    const fallbackTypeName = resource.label || CONTENT_TYPE_NAMES[contentType] || 'Resource';
+    const targetItems = Array.isArray(resource.items) && resource.items.length > 0
+      ? resource.items
+      : [];
+
+    let primaryResult = null;
+    if (resolvedClassId) {
+      try {
+        primaryResult = await getCourseMaterials(subjectId, unitId, resolvedClassId, classNoToUse, contentType);
+      } catch (err) {
+        if (isPesuSessionExpiredError(err)) {
+          throw err;
+        }
+      }
+    }
+
+    if (primaryResult?.type === 'binary' && primaryResult.data) {
+      const ext = getExtensionFromContentType(primaryResult.contentType);
+      const itemName = targetItems[0]?.name || className || fallbackTypeName;
+      downloadedFiles.push(await prepareDownloadedFile(primaryResult.data, ext, itemName));
+      continue;
+    }
+
+    const primaryLinks = primaryResult?.type === 'html'
+      ? parseDownloadLinks(primaryResult.data)
+      : [];
+
+    if (targetItems.length === 0) {
+      for (const link of primaryLinks) {
+        const downloadResult = await downloadSingleFile(resolveDownloadUrl(link.url));
+        if (downloadResult.success && downloadResult.blob) {
+          const itemName = link.name || className || fallbackTypeName;
+          downloadedFiles.push(await prepareDownloadedFile(downloadResult.blob, downloadResult.extension, itemName));
+        }
+      }
+      continue;
+    }
+
+    const usedUrls = new Set();
+
+    for (const targetItem of targetItems) {
+      let matchedLink = findMatchingDownloadLink(primaryLinks, targetItem, usedUrls);
+      let binaryFallback = null;
+
+      if (!matchedLink) {
+        const unitClasses = await fetchUnitClassList();
+        const orderedCandidates = [
+          ...unitClasses.filter((cls) => className && normalizeMatchText(cls.className) === normalizeMatchText(className)),
+          ...unitClasses.filter((cls) => !className || normalizeMatchText(cls.className) !== normalizeMatchText(className))
+        ];
+
+        for (const candidateClass of orderedCandidates) {
+          if (String(candidateClass.id) === resolvedClassId) {
+            continue;
+          }
+
+          let candidateResult = null;
+          try {
+            candidateResult = await getCourseMaterials(
+              subjectId,
+              unitId,
+              candidateClass.id,
+              candidateClass.classNo || '1',
+              contentType
+            );
+          } catch (err) {
+            if (isPesuSessionExpiredError(err)) {
+              throw err;
+            }
+            continue;
+          }
+
+          if (candidateResult?.type === 'binary' && candidateResult.data) {
+            if (String(targetItem.docId || '') === `${candidateClass.id}:${contentType}`) {
+              binaryFallback = candidateResult;
+              break;
+            }
+            continue;
+          }
+
+          if (candidateResult?.type === 'html') {
+            const candidateLinks = parseDownloadLinks(candidateResult.data);
+            matchedLink = findMatchingDownloadLink(candidateLinks, targetItem, usedUrls);
+            if (matchedLink) {
+              break;
+            }
+          }
+        }
+      }
+
+      if (binaryFallback) {
+        const ext = getExtensionFromContentType(binaryFallback.contentType);
+        const itemName = targetItem.name || className || fallbackTypeName;
+        downloadedFiles.push(await prepareDownloadedFile(binaryFallback.data, ext, itemName));
+        continue;
+      }
+
+      const targetDocId = String(targetItem?.docId || '').trim();
+      if (!matchedLink && targetDocId && !targetDocId.includes(':')) {
+        matchedLink = {
+          url: `/Academy/s/referenceMeterials/downloadslidecoursedoc/${targetDocId}`,
+          docId: targetDocId,
+          name: targetItem.name || null
+        };
+      }
+
+      if (matchedLink) {
+        usedUrls.add(matchedLink.url);
+        const downloadResult = await downloadSingleFile(resolveDownloadUrl(matchedLink.url));
+        if (downloadResult.success && downloadResult.blob) {
+          const itemName = targetItem.name || matchedLink.name || className || fallbackTypeName;
+          downloadedFiles.push(await prepareDownloadedFile(downloadResult.blob, downloadResult.extension, itemName));
+        }
+      }
+    }
+  }
+
+  if (downloadedFiles.length === 0) {
+    throw new Error('Could not find or download the requested file.');
+  }
+
+  return downloadedFiles;
 }

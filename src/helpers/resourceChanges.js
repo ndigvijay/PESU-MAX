@@ -132,8 +132,63 @@ export async function buildSubjectResources({ subject, units, previousSubject, s
   };
 }
 
+export function getNotificationSignature(notification) {
+  if (!notification) {
+    return "";
+  }
+
+  const resourcesKey = (notification.resources || [])
+    .map((resource) => {
+      const itemsKey = (resource.items || [])
+        .map((item) => `${item?.docId || ""}:${item?.name || ""}`)
+        .sort()
+        .join(",");
+      return `${resource?.type ?? ""}:${resource?.added ?? ""}:${itemsKey}`;
+    })
+    .sort()
+    .join("|");
+
+  return [
+    String(notification.subjectId || ""),
+    String(notification.unitId || ""),
+    String(notification.classId || ""),
+    resourcesKey
+  ].join("::");
+}
+
+export function dedupeResourceNotifications(notifications = []) {
+  const seenSignatures = new Set();
+  const seenIds = new Set();
+  const deduped = [];
+
+  for (const notification of notifications) {
+    if (!notification?.id || seenIds.has(notification.id)) {
+      continue;
+    }
+
+    const signature = getNotificationSignature(notification);
+    if (signature && seenSignatures.has(signature)) {
+      continue;
+    }
+
+    seenIds.add(notification.id);
+    if (signature) {
+      seenSignatures.add(signature);
+    }
+    deduped.push(notification);
+  }
+
+  return deduped;
+}
+
 export function mergeResourceNotifications(existing = [], incoming = []) {
-  return [...incoming, ...existing]
-    .sort((a, b) => b.detectedAt - a.detectedAt)
-    .slice(0, MAX_RESOURCE_NOTIFICATIONS);
+  const existingSignatures = new Set(existing.map(getNotificationSignature).filter(Boolean));
+  const freshIncoming = incoming.filter((notification) => {
+    const signature = getNotificationSignature(notification);
+    return !signature || !existingSignatures.has(signature);
+  });
+
+  return dedupeResourceNotifications(
+    [...freshIncoming, ...existing].sort((a, b) => b.detectedAt - a.detectedAt)
+  ).slice(0, MAX_RESOURCE_NOTIFICATIONS);
 }

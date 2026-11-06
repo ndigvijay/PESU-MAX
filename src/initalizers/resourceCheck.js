@@ -16,7 +16,9 @@ import {
 import { parallelBatch } from "../helpers/MiscControllers.js";
 import {
   buildSubjectResources,
+  dedupeResourceNotifications,
   findCurrentSemester,
+  getNotificationSignature,
   mergeResourceNotifications
 } from "../helpers/resourceChanges.js";
 import { save, load } from "../utils/storage.js";
@@ -24,10 +26,13 @@ import {
   RESOURCES_KEY,
   RESOURCE_CHECKED_AT_KEY,
   RESOURCE_CHECK_RUNNING_KEY,
-  RESOURCE_NOTIFICATIONS_KEY
+  RESOURCE_NOTIFICATIONS_KEY,
+  RESOURCE_NOTIFICATIONS_READ_KEY
 } from "../utils/storageKeys.js";
 
 export const RESOURCE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
+let resourceCheckPromise = null;
 
 export async function isResourceCheckDue() {
   const checkedAt = await load(RESOURCE_CHECKED_AT_KEY);
@@ -65,6 +70,53 @@ async function fetchClassFiles(subjectId, unitId, classItem, type) {
 async function appendNotifications(notifications) {
   const existing = await load(RESOURCE_NOTIFICATIONS_KEY);
   await save(RESOURCE_NOTIFICATIONS_KEY, mergeResourceNotifications(existing || [], notifications));
+}
+
+export async function dedupeStoredResourceNotifications() {
+  try {
+    const [rawNotifications, rawReadIds] = await Promise.all([
+      load(RESOURCE_NOTIFICATIONS_KEY),
+      load(RESOURCE_NOTIFICATIONS_READ_KEY)
+    ]);
+
+    if (!Array.isArray(rawNotifications) || rawNotifications.length === 0) {
+      return;
+    }
+
+    const deduped = dedupeResourceNotifications(rawNotifications);
+    if (deduped.length === rawNotifications.length) {
+      return;
+    }
+
+    const rawReadSet = new Set(Array.isArray(rawReadIds) ? rawReadIds : []);
+    const readSignatures = new Set();
+
+    for (const notification of rawNotifications) {
+      if (notification?.id && rawReadSet.has(notification.id)) {
+        const signature = getNotificationSignature(notification);
+        if (signature) {
+          readSignatures.add(signature);
+        }
+      }
+    }
+
+    const existingIds = new Set(deduped.map((notification) => notification.id));
+    const nextReadIds = new Set(Array.from(rawReadSet).filter((id) => existingIds.has(id)));
+
+    for (const notification of deduped) {
+      const signature = getNotificationSignature(notification);
+      if (signature && readSignatures.has(signature)) {
+        nextReadIds.add(notification.id);
+      }
+    }
+
+    await save(RESOURCE_NOTIFICATIONS_KEY, deduped);
+    if (Array.isArray(rawReadIds)) {
+      await save(RESOURCE_NOTIFICATIONS_READ_KEY, Array.from(nextReadIds));
+    }
+  } catch (err) {
+    console.error("Error deduplicating stored resource notifications:", err);
+  }
 }
 
 async function runResourceCheck() {
@@ -114,10 +166,19 @@ export function markResourceCheckStarted() {
 }
 
 export async function checkCurrentSemesterResources() {
-  await save(RESOURCE_CHECK_RUNNING_KEY, true);
-  try {
-    await runResourceCheck();
-  } finally {
-    await save(RESOURCE_CHECK_RUNNING_KEY, false);
+  if (resourceCheckPromise) {
+    return resourceCheckPromise;
   }
+
+  resourceCheckPromise = (async () => {
+    await save(RESOURCE_CHECK_RUNNING_KEY, true);
+    try {
+      await runResourceCheck();
+    } finally {
+      await save(RESOURCE_CHECK_RUNNING_KEY, false);
+      resourceCheckPromise = null;
+    }
+  })();
+
+  return resourceCheckPromise;
 }
