@@ -375,6 +375,38 @@ export const settingsWarningSx = {
   color: theme.colors.error,
 };
 
+// Shared Snackbar alert styling per severity
+export const snackbarAlertSx = {
+  success: {
+    width: '100%',
+    fontSize: '12px',
+    backgroundColor: theme.colors.solid,
+    color: theme.colors.onSolid,
+    '& .MuiAlert-icon': { color: theme.colors.onSolid },
+    '& .MuiAlert-message': { color: theme.colors.onSolid },
+    '& .MuiAlert-action': { color: theme.colors.onSolid },
+    '& .MuiSvgIcon-root': { color: theme.colors.onSolid },
+  },
+  warning: {
+    width: '100%',
+    fontSize: '12px',
+    backgroundColor: theme.colors.warningTint,
+    color: theme.colors.text,
+    border: `1px solid ${theme.colors.warningBorder}`,
+    '& .MuiAlert-icon': { color: theme.colors.warning },
+    '& .MuiAlert-action': { color: theme.colors.text },
+  },
+  error: {
+    width: '100%',
+    fontSize: '12px',
+    backgroundColor: theme.colors.dangerTint,
+    color: theme.colors.text,
+    border: `1px solid ${theme.colors.dangerBorder}`,
+    '& .MuiAlert-icon': { color: theme.colors.danger },
+    '& .MuiAlert-action': { color: theme.colors.text },
+  },
+};
+
 const popupButtonSx = {
   borderRadius: '8px',
   padding: '6px 14px',

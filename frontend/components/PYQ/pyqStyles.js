@@ -1,4 +1,5 @@
 import theme from "../../Themes/theme.jsx";
+import { snackbarAlertSx } from "../../styles/styles.js";
 
 export const rowCardSx = {
   padding: "12px",
@@ -34,16 +35,7 @@ export const paginationButtonSx = {
   }
 };
 
-export const successSnackbarAlertSx = {
-  width: "100%",
-  fontSize: "12px",
-  backgroundColor: theme.colors.solid,
-  color: theme.colors.onSolid,
-  "& .MuiAlert-icon": { color: theme.colors.onSolid },
-  "& .MuiAlert-message": { color: theme.colors.onSolid },
-  "& .MuiAlert-action": { color: theme.colors.onSolid },
-  "& .MuiSvgIcon-root": { color: theme.colors.onSolid }
-};
+export const successSnackbarAlertSx = snackbarAlertSx.success;
 
 export const stepHintSx = { fontSize: "13px", color: theme.colors.textMuted, marginBottom: "8px" };
 

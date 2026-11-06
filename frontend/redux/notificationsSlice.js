@@ -38,6 +38,8 @@ export const downloadNotificationResource = createAsyncThunk(
   }
 );
 
+const formatFileCount = (count) => `${count} ${count === 1 ? "file" : "files"}`;
+
 const notificationsSlice = createSlice({
   name: "notifications",
   initialState: {
@@ -48,9 +50,14 @@ const notificationsSlice = createSlice({
     loading: false,
     marking: false,
     downloadingIds: {},
+    downloadNotice: null,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearDownloadNotice: (state) => {
+      state.downloadNotice = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchResourceNotifications.pending, (state) => {
@@ -85,26 +92,53 @@ const notificationsSlice = createSlice({
         if (id) {
           state.downloadingIds[id] = true;
         }
-        state.error = null;
       })
       .addCase(downloadNotificationResource.fulfilled, (state, action) => {
         const id = action.meta.arg?.id;
         if (id) {
           delete state.downloadingIds[id];
         }
+
+        const {
+          downloadedCount = 0,
+          failedCount = 0,
+          failed = [],
+        } = action.payload || {};
+
+        if (failedCount > 0) {
+          const failedNames = failed.map((entry) => entry?.name).filter(Boolean).join(", ");
+          const totalCount = downloadedCount + failedCount;
+          state.downloadNotice = {
+            severity: "warning",
+            message: failedNames
+              ? `Downloaded ${downloadedCount} of ${totalCount} files. Could not download: ${failedNames}`
+              : `Downloaded ${downloadedCount} of ${totalCount} files.`,
+          };
+          return;
+        }
+
+        state.downloadNotice = {
+          severity: "success",
+          message: `Downloaded ${formatFileCount(downloadedCount)}`,
+        };
       })
       .addCase(downloadNotificationResource.rejected, (state, action) => {
         const id = action.meta.arg?.id;
         if (id) {
           delete state.downloadingIds[id];
         }
-        state.error = action.payload || "Could not download file. Please try again.";
+        state.downloadNotice = {
+          severity: "error",
+          message: action.payload || "Could not download file. Please try again.",
+        };
       });
   },
 });
 
 const selectItems = (state) => state.notifications.items;
 const selectReadIds = (state) => state.notifications.readIds;
+
+export const { clearDownloadNotice } = notificationsSlice.actions;
 
 export const selectReadIdSet = createSelector([selectReadIds], (readIds) => new Set(readIds));
 

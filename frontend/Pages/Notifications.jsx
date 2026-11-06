@@ -1,12 +1,13 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Box, Button, CircularProgress, IconButton, LinearProgress, Stack, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, IconButton, LinearProgress, Stack, Typography, Snackbar, Alert } from "@mui/material";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
 import theme from "../Themes/theme.jsx";
 import ResourceNotificationRow from "../components/Notifications/ResourceNotificationRow.jsx";
 import {
+  clearDownloadNotice,
   downloadNotificationResource,
   markNotificationsRead,
   selectReadIdSet,
@@ -18,7 +19,10 @@ import {
   settingsRowDescriptionSx,
   settingsRowTitleSx,
   settingsWarningSx,
+  snackbarAlertSx,
 } from "../styles/styles.js";
+
+const anchorOrigin = { vertical: "bottom", horizontal: "center" };
 
 const groupByCourseAndUnit = (notifications) => {
   const groups = new Map();
@@ -43,12 +47,18 @@ const groupByCourseAndUnit = (notifications) => {
 
 const Notifications = () => {
   const dispatch = useDispatch();
-  const { items: notifications, ready, error, marking, checking, downloadingIds } = useSelector(
+  const { items: notifications, ready, error, marking, checking, downloadingIds, downloadNotice } = useSelector(
     (state) => state.notifications
   );
   const readIdSet = useSelector(selectReadIdSet);
   const unreadCount = useSelector(selectUnreadCount);
   const groups = useMemo(() => groupByCourseAndUnit(notifications), [notifications]);
+  const closeDownloadNotice = () => dispatch(clearDownloadNotice());
+  const lastNotice = useRef(null);
+  if (downloadNotice) {
+    lastNotice.current = downloadNotice;
+  }
+  const notice = downloadNotice || lastNotice.current;
 
   return (
     <Box sx={{ padding: "12px", display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -136,6 +146,23 @@ const Notifications = () => {
           </Stack>
         </Box>
       )}
+
+      <Snackbar
+        open={Boolean(downloadNotice)}
+        autoHideDuration={6000}
+        onClose={closeDownloadNotice}
+        anchorOrigin={anchorOrigin}
+      >
+        {notice && (
+          <Alert
+            severity={notice.severity}
+            onClose={closeDownloadNotice}
+            sx={snackbarAlertSx[notice.severity] || snackbarAlertSx.success}
+          >
+            {notice.message}
+          </Alert>
+        )}
+      </Snackbar>
     </Box>
   );
 };

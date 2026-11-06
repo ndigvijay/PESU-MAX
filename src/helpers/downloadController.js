@@ -107,22 +107,29 @@ export async function handleNotificationDownload(notification, sendResponse) {
   }
 
   try {
-    const files = await downloadNotificationFiles(notification);
-    const downloadIds = [];
+    const { files, failed } = await downloadNotificationFiles(notification);
+    let downloadedCount = 0;
 
     for (const file of files) {
-      const dataUrl = await blobToDataUrl(file.blob, file.mimeType || 'application/octet-stream');
-      const downloadId = await triggerChromeDownload(dataUrl, file.filename);
-      downloadIds.push(downloadId);
+      try {
+        const dataUrl = await blobToDataUrl(file.blob, file.mimeType || 'application/octet-stream');
+        await triggerChromeDownload(dataUrl, file.filename);
+        downloadedCount++;
+      } catch (error) {
+        failed.push({
+          name: file.filename,
+          error: error.message || "Could not save this file"
+        });
+      }
     }
 
     sendResponse({
       success: true,
-      downloadedCount: downloadIds.length,
-      downloadIds
+      downloadedCount,
+      failedCount: failed.length,
+      failed
     });
   } catch (error) {
-    console.error("Notification download error:", error);
     sendResponse({ error: error.message || "Could not download file" });
   }
 }
