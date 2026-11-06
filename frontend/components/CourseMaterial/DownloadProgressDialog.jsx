@@ -113,7 +113,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 {mergedEntries.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
-                      Created {downloadResult.stats?.totalMergedFiles || 0} subject-wise merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
+                      Created {downloadResult.stats?.totalMergedFiles || 0} {downloadResult.stats?.mergeMode || 'subject-wise'} merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
                     </Typography>
                     <Box component="ul" sx={{ mt: 0.5, pl: 2, mb: 0, color: theme.colors.onSolid, fontSize: '11px' }}>
                       {mergedEntries.map(([contentType, count]) => (

@@ -88,6 +88,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       request.contentTypes,
       request.mergeOptions,
       request.mergeSlides,
+      request.mergeMode,
       sender,
       sendResponse
     );

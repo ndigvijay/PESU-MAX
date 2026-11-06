@@ -68,7 +68,7 @@ export const fetchSemesters = () => {
 };
 
 
-export const downloadMaterials = (selectedItems, contentTypes, mergeOptions = {}, onProgress) => {
+export const downloadMaterials = (selectedItems, contentTypes, mergeOptions = {}, mergeMode = "subject-wise", onProgress) => {
   return new Promise((resolve, reject) => {
     // Set up progress listener
     const progressListener = (port) => {
@@ -91,6 +91,7 @@ export const downloadMaterials = (selectedItems, contentTypes, mergeOptions = {}
       selectedItems,
       contentTypes,
       mergeOptions,
+      mergeMode,
       mergeSlides: Boolean(mergeOptions?.slides)
     }, (response) => {
       chrome.runtime.onConnect.removeListener(progressListener);
