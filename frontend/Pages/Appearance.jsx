@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useDispatch } from "react-redux";
 import { Box, Typography, IconButton, Stack } from "@mui/material";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
@@ -7,8 +7,11 @@ import theme from "../Themes/theme.jsx";
 import SettingsAccentRow from "../components/Settings/SettingsAccentRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
+import SettingsEditRow from "../components/Settings/SettingsEditRow.jsx";
+import SettingsSection from "../components/Settings/SettingsSection.jsx";
+import SideMenuSettings from "../components/Settings/SideMenuSettings.jsx";
+import MaterialColumnsDialog from "../components/CourseMaterial/MaterialColumnsDialog.jsx";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
-import { settingsHintSx } from "../styles/styles.js";
 import {
   DARK_ACCENT_OPTIONS,
   DEFAULT_DARK_ACCENT,
@@ -17,8 +20,6 @@ import {
 } from "../../src/content/theme";
 import {
   MATERIAL_TABLE_KEY,
-  MENU_ICONS_KEY,
-  SIDE_MENU_DOCK_KEY,
   THEME_DARK_ACCENT_KEY,
   THEME_DARK_KEY,
   THEME_FONT_KEY,
@@ -28,8 +29,7 @@ import {
 
 const Appearance = () => {
   const dispatch = useDispatch();
-  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Side menu style");
-  const dockOn = dock.ready && dock.value === true;
+  const [materialColumnsOpen, setMaterialColumnsOpen] = useState(false);
   const dark = useStoredSetting(THEME_DARK_KEY, false, "Dark mode");
   const darkOn = dark.ready && dark.value === true;
 
@@ -38,7 +38,13 @@ const Appearance = () => {
   };
 
   return (
-    <Box sx={{ padding: "12px" }}>
+    <Box sx={{
+      padding: "12px",
+      boxSizing: "border-box",
+      height: "100%",
+      minHeight: 0,
+      overflowY: "auto",
+    }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
         <IconButton
           onClick={handleBack}
@@ -56,56 +62,64 @@ const Appearance = () => {
         </Typography>
       </Box>
 
-      <Stack spacing="8px">
-        {darkOn ? (
-          <SettingsAccentRow
-            storageKey={THEME_DARK_ACCENT_KEY}
-            title="Dark Mode Accent"
-            options={DARK_ACCENT_OPTIONS}
-            fallback={DEFAULT_DARK_ACCENT}
-            tone="dark"
-            columns={4}
+      <Stack spacing="16px">
+        <SettingsSection title="Theme" group>
+          {darkOn ? (
+            <SettingsAccentRow
+              storageKey={THEME_DARK_ACCENT_KEY}
+              title="Dark Mode Accent"
+              options={DARK_ACCENT_OPTIONS}
+              fallback={DEFAULT_DARK_ACCENT}
+              tone="dark"
+              columns={4}
+            />
+          ) : (
+            <SettingsAccentRow
+              storageKey={THEME_PALETTE_KEY}
+              title="Theme colour"
+              options={THEME_OPTIONS}
+            />
+          )}
+
+          <SettingsSelectRow
+            storageKey={THEME_FONT_KEY}
+            title="Font"
+            description="Typeface used across the site"
+            options={FONT_OPTIONS}
           />
-        ) : (
-          <SettingsAccentRow
-            storageKey={THEME_PALETTE_KEY}
-            title="Theme colour"
-            options={THEME_OPTIONS}
+        </SettingsSection>
+
+        <SettingsSection title="Page" group>
+          <SettingsToggleRow
+            storageKey={TOP_BAR_KEY}
+            title="Remove top bar"
+            description="Hides the PESU Academy header bar"
           />
-        )}
+        </SettingsSection>
 
-        <SettingsSelectRow
-          storageKey={THEME_FONT_KEY}
-          title="Font"
-          description="Typeface used across the site"
-          options={FONT_OPTIONS}
-        />
+        <SettingsSection title="Side menu" group>
+          <SideMenuSettings />
+        </SettingsSection>
 
-        <SettingsToggleRow
-          storageKey={TOP_BAR_KEY}
-          title="Remove top bar"
-          description="Hides the PESU Academy header bar"
-        />
+        <SettingsSection title="Course material" group>
+          <SettingsToggleRow
+            storageKey={MATERIAL_TABLE_KEY}
+            title="Improved Material table"
+            description="Shows course material table using better icons, pills, flag dots."
+          />
 
-        <SettingsToggleRow
-          storageKey={MENU_ICONS_KEY}
-          title="Better icons"
-          description="Replaces the side-menu icons with better and bolder icons."
-          disabled={dockOn}
-        />
-
-        {dockOn && (
-          <Typography variant="body2" sx={settingsHintSx}>
-            The minimal side menu always uses better icons.
-          </Typography>
-        )}
-
-        <SettingsToggleRow
-          storageKey={MATERIAL_TABLE_KEY}
-          title="Improved Material table"
-          description="Shows course material table using better icons, pills, flag dots."
-        />
+          <SettingsEditRow
+            title="Re-order material types"
+            description="Move or hide the material columns of the Course Units table."
+            onClick={() => setMaterialColumnsOpen(true)}
+          />
+        </SettingsSection>
       </Stack>
+
+      <MaterialColumnsDialog
+        open={materialColumnsOpen}
+        onClose={() => setMaterialColumnsOpen(false)}
+      />
     </Box>
   );
 };
