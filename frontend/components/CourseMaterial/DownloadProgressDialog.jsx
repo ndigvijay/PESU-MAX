@@ -12,6 +12,7 @@ import {
   Alert
 } from "@mui/material";
 import theme from "../../Themes/theme.jsx";
+import { DEFAULT_MERGE_MODE } from "../../../src/helpers/mergeModes.js";
 import { clearDownloadResult } from "../../redux/courseMaterialSlice.js";
 import {
   dialogPaperSx,
@@ -113,7 +114,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 {mergedEntries.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
-                      Created {downloadResult.stats?.totalMergedFiles || 0} {downloadResult.stats?.mergeMode || 'subject-wise'} merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
+                      Created {downloadResult.stats?.totalMergedFiles || 0} {downloadResult.stats?.mergeMode || DEFAULT_MERGE_MODE} merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
                     </Typography>
                     <Box component="ul" sx={{ mt: 0.5, pl: 2, mb: 0, color: theme.colors.onSolid, fontSize: '11px' }}>
                       {mergedEntries.map(([contentType, count]) => (
@@ -151,7 +152,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                           >
                             <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
                               {(item.subjectName && item.subjectName !== item.className)
-                                ? `${item.subjectName} – ${item.className}`
+                                ? `${item.subjectName} - ${item.className}`
                                 : (item.className || 'Unknown class')}
                             </Typography>
                             {item.error && (

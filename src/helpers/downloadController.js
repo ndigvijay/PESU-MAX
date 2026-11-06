@@ -1,10 +1,11 @@
 import { createBulkDownloadZip, downloadNotificationFiles } from './downloadHelper.js';
 import { blobToDataUrl } from './blobEncoding.js';
 import { CONTENT_TYPE_IDS } from './pesuAPI.js';
+import { DEFAULT_MERGE_MODE } from './mergeModes.js';
 
 const DEFAULT_CONTENT_TYPES = [CONTENT_TYPE_IDS.slides];
 
-export async function handleBulkDownload(selectedItems, contentTypes, mergeOptions = {}, mergeSlides = false, mergeMode = "subject-wise", sender, sendResponse) {
+export async function handleBulkDownload(selectedItems, contentTypes, mergeOptions = {}, mergeSlides = false, mergeMode = DEFAULT_MERGE_MODE, sender, sendResponse) {
   if (!selectedItems || selectedItems.length === 0) {
     sendResponse({ error: "No items selected" });
     return;

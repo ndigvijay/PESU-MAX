@@ -30,8 +30,7 @@ import {
 } from "../constants/constants.js";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
 import { MERGE_MODE_KEY } from "../../src/utils/storageKeys.js";
-
-const DEFAULT_MERGE_MODE = "subject-wise";
+import { DEFAULT_MERGE_MODE, normalizeMergeMode } from "../../src/helpers/mergeModes.js";
 
 const CourseMaterial = () => {
   const dispatch = useDispatch();
@@ -42,8 +41,8 @@ const CourseMaterial = () => {
   const [downloadDialogOpen, setDownloadDialogOpen] = useState(false);
   const [pendingContentTypes, setPendingContentTypes] = useState([]);
   const [contentTypeSelectionState, setContentTypeSelectionState] = useState({ ...DEFAULT_CONTENT_TYPE_SELECTION });
-  const mergeModeSetting = useStoredSetting(MERGE_MODE_KEY, DEFAULT_MERGE_MODE, "Merge Slides");
-  const mergeMode = mergeModeSetting.value === "unit-wise" ? "unit-wise" : DEFAULT_MERGE_MODE;
+  const mergeModeSetting = useStoredSetting(MERGE_MODE_KEY, DEFAULT_MERGE_MODE, "Default merge mode");
+  const mergeMode = normalizeMergeMode(mergeModeSetting.value);
   
   // Redux state
   const { search, semester, page, rowsPerPage, downloading } = useSelector(

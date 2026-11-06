@@ -18,6 +18,7 @@ import {
   subscribeToMenuReorder,
 } from "../../src/content/menuReorder";
 import { START_PAGE_OPTIONS } from "../../src/content/startPage";
+import { MERGE_MODE_OPTIONS } from "../../src/helpers/mergeModes.js";
 import {
   ACADEMY_CREDENTIAL_KEY,
   BACK_NAVIGATION_KEY,
@@ -32,11 +33,6 @@ import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js
 const SIDE_MENU_STYLE_OPTIONS = [
   { value: false, label: "Classic" },
   { value: true, label: "Minimal" },
-];
-
-const MERGE_MODE_OPTIONS = [
-  { value: "subject-wise", label: "Subject-wise" },
-  { value: "unit-wise", label: "Unit-wise" },
 ];
 
 const Settings = () => {
@@ -186,8 +182,8 @@ const Settings = () => {
         <SettingsSection title="Advanced">
           <SettingsSelectRow
             storageKey={MERGE_MODE_KEY}
-            title="Merge Slides"
-            description="Choose whether selected materials are merged unit-wise or subject-wise."
+            title="Default merge mode"
+            description="Groups merged PDFs per subject or per unit when downloading course materials."
             options={MERGE_MODE_OPTIONS}
           />
         </SettingsSection>

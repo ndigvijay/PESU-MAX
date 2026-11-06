@@ -190,18 +190,13 @@ export const parseDownloadLinks = (htmlData) => {
   const downloadLinks = [];
 
   const normalizeMaterialUrl = (url) => {
-    if (typeof url !== 'string') {
-      return '';
-    }
-
     const cleanUrl = url.split('#')[0];
     const match = cleanUrl.match(
       /(?:https?:\/\/[^/]+)?\/Academy\/[as]\/referenceMeterials\/(?:downloadslidecoursedoc|downloadcoursedoc)\/([^/?#]+)/i
     );
 
     if (match) {
-      const endpoint = cleanUrl.match(/\/referenceMeterials\/(downloadslidecoursedoc|downloadcoursedoc)\//i)?.[1];
-      return `/Academy/s/referenceMeterials/${endpoint}/${match[1]}`;
+      return `/Academy/s/referenceMeterials/downloadslidecoursedoc/${match[1]}`;
     }
 
     return cleanUrl;
@@ -219,7 +214,7 @@ export const parseDownloadLinks = (htmlData) => {
       url: cleanUrl,
       type,
       ...(docId ? { docId } : {}),
-      name: element ? $(element).text().replace(/\s+/g, ' ').trim() || null : null
+      name: $(element).text().replace(/\s+/g, ' ').trim() || null
     });
   };
 
@@ -251,7 +246,7 @@ export const parseDownloadLinks = (htmlData) => {
     }
 
     addDownloadLink(
-      `/Academy/s/referenceMeterials/${match[1]}/${match[2]}`,
+      `/Academy/s/referenceMeterials/downloadslidecoursedoc/${match[2]}`,
       match[1] === 'downloadslidecoursedoc' ? 'slidecoursedoc' : 'coursedoc',
       element,
       match[2]
@@ -265,30 +260,6 @@ export const parseDownloadLinks = (htmlData) => {
       addDownloadLink(href, 'direct', element);
     }
   });
-
-  if (downloadLinks.length === 0 && typeof htmlData === 'string') {
-    const urlPattern = /(?:https?:\/\/[^/"']+)?\/Academy\/[as]\/referenceMeterials\/(downloadslidecoursedoc|downloadcoursedoc)\/([^/?#"'\\]+)/gi;
-    let urlMatch;
-    while ((urlMatch = urlPattern.exec(htmlData)) !== null) {
-      addDownloadLink(
-        `/Academy/s/referenceMeterials/${urlMatch[1]}/${urlMatch[2]}`,
-        urlMatch[1] === 'downloadslidecoursedoc' ? 'slidecoursedoc' : 'coursedoc',
-        null,
-        urlMatch[2]
-      );
-    }
-
-    const endpointPattern = /(downloadslidecoursedoc|downloadcoursedoc)\s*['"]?\s*[\[(]\s*['"]([^'")?,]+)/gi;
-    let match;
-    while ((match = endpointPattern.exec(htmlData)) !== null) {
-      addDownloadLink(
-        `/Academy/s/referenceMeterials/${match[1]}/${match[2]}`,
-        match[1] === 'downloadslidecoursedoc' ? 'slidecoursedoc' : 'coursedoc',
-        null,
-        match[2]
-      );
-    }
-  }
 
   return downloadLinks;
 };

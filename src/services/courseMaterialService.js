@@ -1,3 +1,5 @@
+import { DEFAULT_MERGE_MODE } from "../helpers/mergeModes.js";
+
 export const fetchPesuData = ({ search, semester, page, limit }) => {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage({
@@ -68,7 +70,7 @@ export const fetchSemesters = () => {
 };
 
 
-export const downloadMaterials = (selectedItems, contentTypes, mergeOptions = {}, mergeMode = "subject-wise", onProgress) => {
+export const downloadMaterials = (selectedItems, contentTypes, mergeOptions = {}, mergeMode = DEFAULT_MERGE_MODE, onProgress) => {
   return new Promise((resolve, reject) => {
     // Set up progress listener
     const progressListener = (port) => {

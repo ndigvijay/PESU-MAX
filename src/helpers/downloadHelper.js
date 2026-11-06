@@ -13,6 +13,7 @@ import { parallelBatch } from './MiscControllers.js';
 import { convertMultipleOfficeBlobsToPdfWithILovePdf, isOfficeConvertibleExtension } from './ilovepdfHelper.js';
 import { load } from '../utils/storage.js';
 import { RESOURCES_KEY } from '../utils/storageKeys.js';
+import { DEFAULT_MERGE_MODE, MERGE_MODES, normalizeMergeMode } from './mergeModes.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -326,18 +327,19 @@ function getEnabledMergeContentTypes(contentTypes, mergeOptions = {}, mergeSlide
 }
 
 function buildMergeGroupKey(subjectId, unitId, contentType, mergeMode) {
-  return mergeMode === 'unit-wise'
+  return normalizeMergeMode(mergeMode) === MERGE_MODES.unit
     ? `${subjectId}:${unitId}:${contentType}`
     : `${subjectId}:${contentType}`;
 }
 
-function buildMergedContentFilePath(subjectName, subjectCode, unitName, contentTypeName, mergeMode) {
+function buildMergedContentFilePath(subjectName, subjectCode, unitName, unitId, contentTypeName, mergeMode) {
   const safeFolderName = sanitizeFilename(subjectName);
   const safeContentFolder = sanitizeFilename(contentTypeName);
-  const mergedFileName = mergeMode === 'unit-wise'
+  const unitLabel = String(unitName || '').trim() ? sanitizeFilename(unitName) : `Unit_${unitId}`;
+  const mergedFileName = normalizeMergeMode(mergeMode) === MERGE_MODES.unit
     ? (subjectCode
-      ? `${sanitizeFilename(subjectCode)}_${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`
-      : `${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`)
+      ? `${sanitizeFilename(subjectCode)}_${unitLabel}_Merged_${safeContentFolder}.pdf`
+      : `${unitLabel}_Merged_${safeContentFolder}.pdf`)
     : (subjectCode
       ? `${sanitizeFilename(subjectCode)}_Merged_${safeContentFolder}.pdf`
       : `${safeFolderName}_Merged_${safeContentFolder}.pdf`);
@@ -516,8 +518,8 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
 }
 
 export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2], options = {}) {
-  const { mergeOptions = {}, mergeSlides = false, mergeMode = 'subject-wise' } = options;
-  const normalizedMergeMode = mergeMode === 'unit-wise' ? 'unit-wise' : 'subject-wise';
+  const { mergeOptions = {}, mergeSlides = false, mergeMode = DEFAULT_MERGE_MODE } = options;
+  const normalizedMergeMode = normalizeMergeMode(mergeMode);
   const zip = new JSZip();
   const normalizedMergeOptions = normalizeMergeOptions(mergeOptions, mergeSlides);
   const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, normalizedMergeOptions);
@@ -534,8 +536,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
             subjectId: item.subjectId,
             subjectCode: item.subjectCode,
             subjectName: item.subjectName,
-            unitId: normalizedMergeMode === 'unit-wise' ? item.unitId : null,
-            unitName: normalizedMergeMode === 'unit-wise' ? item.unitName : null,
+            unitId: normalizedMergeMode === MERGE_MODES.unit ? item.unitId : null,
+            unitName: normalizedMergeMode === MERGE_MODES.unit ? item.unitName : null,
             contentType: mergeContentType.id,
             contentTypeName: mergeContentType.name,
             files: []
@@ -876,6 +878,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           subjectGroup.subjectName,
           subjectGroup.subjectCode,
           subjectGroup.unitName,
+          subjectGroup.unitId,
           subjectGroup.contentTypeName,
           normalizedMergeMode
         );

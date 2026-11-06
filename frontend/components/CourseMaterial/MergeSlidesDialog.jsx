@@ -17,22 +17,28 @@ import DownloadIcon from "@mui/icons-material/Download";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import theme from "../../Themes/theme.jsx";
 import { DEFAULT_MERGE_SELECTION, MERGEABLE_CONTENT_TYPE_OPTIONS } from "../../constants/constants.js";
+import { DEFAULT_MERGE_MODE, MERGE_MODE_OPTIONS, mergeScopeLabel } from "../../../src/helpers/mergeModes.js";
 import { dialogPaperSx, dialogTitleSx, primaryButtonSx, secondaryButtonSx, selectSx } from "../../styles/styles.js";
 
-const MERGE_OPTION_DESCRIPTIONS = {
-  slides: "Create one merged PDF per unit inside the Slides folder.",
-  notes: "Create one merged PDF per unit inside the Notes folder.",
-  assignments: "Create one merged PDF per unit inside the Assignments folder.",
-  qb: "Create one merged PDF per unit inside the QB folder. Repeated unit files are included once.",
-  qa: "Create one merged PDF per unit inside the QA folder. Repeated unit files are included once."
+const MERGE_OPTION_FOLDERS = {
+  slides: "Slides",
+  notes: "Notes",
+  assignments: "Assignments",
+  qb: "QB",
+  qa: "QA"
 };
 
-const MERGE_MODE_OPTIONS = [
-  { value: "subject-wise", label: "Subject-wise" },
-  { value: "unit-wise", label: "Unit-wise" }
-];
+const describeMergeOption = (key, mode) => {
+  const scope = mergeScopeLabel(mode);
+  const folder = MERGE_OPTION_FOLDERS[key] || "materials";
+  const description = `Create one merged PDF per ${scope} inside the ${folder} folder.`;
 
-const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedContentTypes = [], mergeMode = "subject-wise" }) => {
+  return key === "qb" || key === "qa"
+    ? `${description} Repeated unit files are included once.`
+    : description;
+};
+
+const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedContentTypes = [], mergeMode = DEFAULT_MERGE_MODE }) => {
   const [selectedMergeTypes, setSelectedMergeTypes] = useState(DEFAULT_MERGE_SELECTION);
   const [selectedMergeMode, setSelectedMergeMode] = useState(mergeMode);
 
@@ -82,7 +88,7 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
       </DialogTitle>
       <DialogContent>
         <Typography variant="body2" sx={{ color: theme.colors.textMuted, fontSize: "12px", lineHeight: 1.6 }}>
-          Choose which selected material types should be merged {selectedMergeMode} into one PDF per {selectedMergeMode === "unit-wise" ? "unit" : "subject"}.
+          Choose which selected material types to merge into one PDF per {mergeScopeLabel(selectedMergeMode)}.
         </Typography>
         <Typography variant="body2" sx={{ color: theme.colors.textSoft, fontSize: "11px", mt: 1 }}>
           PDF files are merged directly. PPT/PPTX and DOC/DOCX files are converted to PDF first. Unsupported files stay separate.
@@ -148,7 +154,7 @@ const MergeMaterialsDialog = ({ open, onClose, onConfirm, onBack, selectedConten
                     Merge {option.label}
                   </Typography>
                   <Typography sx={{ fontSize: "11px", color: theme.colors.textMuted, lineHeight: 1.5 }}>
-                    {MERGE_OPTION_DESCRIPTIONS[option.key]}
+                    {describeMergeOption(option.key, selectedMergeMode)}
                   </Typography>
                 </Box>
               </Box>
