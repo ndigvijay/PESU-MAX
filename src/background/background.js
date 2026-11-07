@@ -159,7 +159,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "searchLibraryPyqs") {
     searchLibraryPyqs({
       query: request.query,
-      year: request.year
+      year: request.year,
+      subjectName: request.subjectName
     })
       .then((data) => sendResponse({ data }))
       .catch((error) => sendResponse({ error: error.message }));
@@ -170,6 +171,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     loadMoreLibraryPyqs({
       query: request.query,
       year: request.year,
+      subjectName: request.subjectName,
       cursor: request.cursor
     })
       .then((data) => sendResponse({ data }))

@@ -2,7 +2,12 @@ import JSZip from "jszip";
 import * as cheerio from "cheerio";
 import { load, save } from "../utils/storage.js";
 import { parallelBatch } from "../helpers/MiscControllers.js";
-import { recordNumberFromId, subjectKeyFromCourseCode } from "../helpers/libraryPaperLinks.js";
+import {
+  courseKeyFromQuery,
+  librarySearchTitle,
+  recordNumberFromId,
+  subjectKeyFromCourseCode
+} from "../helpers/libraryPaperLinks.js";
 import {
   readCachedSearch,
   serializeLibraryRequest,
@@ -30,6 +35,7 @@ const PYQ_CATEGORY = "Digital Library";
 const EAGER_RESULT_LIMIT = 40;
 const EAGER_PAGE_LIMIT = 4;
 const FULL_SEARCH_PAGE_LIMIT = 10;
+const RENAMED_COURSE_PAGE_LIMIT = 3;
 const PAPER_CHECK_CONCURRENCY = 3;
 const PDF_CACHE_TTL_MS = 15 * 60 * 1000;
 
@@ -497,7 +503,7 @@ function buildSearchFields({ query, year }) {
   return {
     txtMemberid: "",
     txtPassword: "",
-    txtTitle: query,
+    txtTitle: librarySearchTitle(query),
     txtAuthor: "",
     txtYear: year || "",
     txtSubject: "",
@@ -574,6 +580,17 @@ async function fetchNextSearchPage({ query, year, cursor }, searchOptions) {
   return result.responseText;
 }
 
+function filterCourseKeyResults(results, query) {
+  const courseKey = courseKeyFromQuery(query);
+  if (!courseKey) {
+    return results;
+  }
+
+  return results.filter(
+    (result) => subjectKeyFromCourseCode(result.courseCode) === courseKey
+  );
+}
+
 function readSearchPage(responseText, query) {
   const parsed = parseSearchResults(responseText, query);
   const fields = extractAspNetFieldsFromDelta(responseText);
@@ -583,7 +600,8 @@ function readSearchPage(responseText, query) {
 
   return {
     totalResults: parsed.totalResults,
-    results: parsed.results,
+    results: filterCourseKeyResults(parsed.results, query),
+    rawIds: parsed.results.map((result) => result.id),
     nextCursor: cursor
   };
 }
@@ -592,31 +610,106 @@ function appendSearchPage(entry, page) {
   const seenIds = new Set(entry.results.map((item) => item.id));
   const freshResults = page.results.filter((item) => !seenIds.has(item.id));
   const results = [...entry.results, ...freshResults];
-  const complete = !page.nextCursor || freshResults.length === 0;
+
+  const entryRawIds = Array.isArray(entry.rawIds) ? entry.rawIds : [];
+  const seenRawIds = new Set([
+    ...entryRawIds,
+    ...entry.results.map((item) => item.id)
+  ]);
+  const pageRawIds = Array.isArray(page.rawIds)
+    ? page.rawIds
+    : page.results.map((item) => item.id);
+  const freshRawIds = [];
+  for (const rawId of pageRawIds) {
+    if (!seenRawIds.has(rawId)) {
+      seenRawIds.add(rawId);
+      freshRawIds.push(rawId);
+    }
+  }
+
+  const complete = !page.nextCursor || freshRawIds.length === 0;
 
   return {
     ...entry,
     totalResults: Math.max(page.totalResults || 0, results.length),
     results,
+    rawIds: [...entryRawIds, ...freshRawIds],
     complete,
     nextCursor: complete ? null : page.nextCursor
   };
 }
 
-function sortByNewestYear(results) {
-  return [...results].sort((first, second) => (second.year || 0) - (first.year || 0));
+const MONTH_NUMBERS = {
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12
+};
+
+function examSessionText(title) {
+  const text = normalizeText(title).replace(/\s*\([A-Z0-9]+\)\s*$/i, "");
+  const esaIndex = text.toUpperCase().lastIndexOf("(ESA)");
+  if (esaIndex >= 0) {
+    return text.slice(esaIndex + "(ESA)".length);
+  }
+
+  const markerIndex = text.toLowerCase().indexOf("[e resource : question paper]");
+  if (markerIndex >= 0) {
+    return text.slice(markerIndex + "[e resource : question paper]".length);
+  }
+
+  return text;
 }
 
-async function performLibrarySearch({ query, year }, { asMember = false, loadAllPages = false } = {}) {
+function examSessionMonth(title) {
+  const months = examSessionText(title).match(
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/gi
+  );
+  if (!months || months.length === 0) {
+    return 0;
+  }
+
+  const lastMonth = months[months.length - 1].slice(0, 3).toLowerCase();
+  return MONTH_NUMBERS[lastMonth] || 0;
+}
+
+function compareResultsByRecency(first, second) {
+  const yearDifference = (second.year || 0) - (first.year || 0);
+  if (yearDifference !== 0) {
+    return yearDifference;
+  }
+
+  return examSessionMonth(second.title) - examSessionMonth(first.title);
+}
+
+function sortResultsByRecency(results) {
+  return [...results].sort(compareResultsByRecency);
+}
+
+async function performLibrarySearch(
+  { query, year },
+  { asMember = false, loadAllPages = false, maxPages = 0 } = {}
+) {
   const searchOptions = { asMember };
+  const needsAllPages = loadAllPages || Boolean(courseKeyFromQuery(query));
   const firstPage = readSearchPage(await fetchFirstSearchPage({ query, year }, searchOptions), query);
   let entry = appendSearchPage(
     { query, year, totalResults: 0, results: [], complete: false, nextCursor: null },
     firstPage
   );
 
-  if (loadAllPages || entry.totalResults <= EAGER_RESULT_LIMIT) {
-    const pageLimit = loadAllPages ? FULL_SEARCH_PAGE_LIMIT : EAGER_PAGE_LIMIT;
+  if (maxPages > 0 || needsAllPages || entry.totalResults <= EAGER_RESULT_LIMIT) {
+    const pageLimit = maxPages > 0
+      ? maxPages
+      : (needsAllPages ? FULL_SEARCH_PAGE_LIMIT : EAGER_PAGE_LIMIT);
     for (let pageCount = 1; pageCount < pageLimit && !entry.complete; pageCount += 1) {
       const page = readSearchPage(
         await fetchNextSearchPage({ query, year, cursor: entry.nextCursor }, searchOptions),
@@ -626,7 +719,16 @@ async function performLibrarySearch({ query, year }, { asMember = false, loadAll
     }
   }
 
-  return entry.complete ? { ...entry, results: sortByNewestYear(entry.results) } : entry;
+  if (!entry.complete) {
+    return entry;
+  }
+
+  const results = sortResultsByRecency(entry.results);
+  return {
+    ...entry,
+    results,
+    totalResults: courseKeyFromQuery(query) ? results.length : entry.totalResults
+  };
 }
 
 async function searchPapersAsMember({ query, year }) {
@@ -637,9 +739,108 @@ async function searchPapersAsMember({ query, year }) {
   return entry.results;
 }
 
+function titleSubjectName(title) {
+  const text = normalizeText(title);
+  const markerIndex = text.toLowerCase().indexOf("[e resource");
+  if (markerIndex >= 0) {
+    return text.slice(0, markerIndex);
+  }
+
+  const separatorIndex = text.indexOf(" : ");
+  return separatorIndex >= 0 ? text.slice(0, separatorIndex) : "";
+}
+
+function normalizeSubjectName(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function departmentLettersForKey(courseKey) {
+  return (String(courseKey || "").match(/^[A-Z]+/) || [""])[0];
+}
+
+function programmePrefixFromCode(courseCode) {
+  const code = String(courseCode || "").trim().toUpperCase();
+  return /^[A-Z]{2}\d{2}(?=[A-Z])/.test(code) ? code.slice(0, 2) : "";
+}
+
+function fullCourseCodeFromQuery(query) {
+  const code = String(query || "").trim().toUpperCase().replace(/\)+$/, "");
+  return /^[A-Z]{2}\d{2}[A-Z]/.test(code) ? code : "";
+}
+
+async function searchRenamedCourseResults(courseKey, subjectName, mainCourseCode) {
+  const currentYear = new Date().getFullYear();
+  const targetName = normalizeSubjectName(subjectName);
+  const mainDepartment = departmentLettersForKey(courseKey);
+  const mainProgramme = programmePrefixFromCode(mainCourseCode);
+  const extras = [];
+
+  for (const year of [currentYear, currentYear - 1]) {
+    try {
+      const entry = await performLibrarySearch(
+        { query: subjectName, year: String(year) },
+        { maxPages: RENAMED_COURSE_PAGE_LIMIT }
+      );
+      extras.push(...entry.results);
+    } catch {
+      // A failed supplement year must not discard the main course results.
+    }
+  }
+
+  return extras.filter((result) => {
+    const extraKey = subjectKeyFromCourseCode(result.courseCode);
+    if (extraKey === courseKey || departmentLettersForKey(extraKey) !== mainDepartment) {
+      return false;
+    }
+    if (mainProgramme && programmePrefixFromCode(result.courseCode) !== mainProgramme) {
+      return false;
+    }
+
+    return normalizeSubjectName(titleSubjectName(result.title)) === targetName;
+  });
+}
+
+async function mergeRenamedCourseResults(entry, { query, year, subjectName }) {
+  const courseKey = courseKeyFromQuery(query);
+  const cleanSubjectName = normalizeText(subjectName);
+  if (!courseKey || normalizeText(year) || !cleanSubjectName) {
+    return entry;
+  }
+
+  const mainCourseCode = fullCourseCodeFromQuery(query)
+    || entry.results.find(
+      (result) => subjectKeyFromCourseCode(result.courseCode) === courseKey
+    )?.courseCode
+    || "";
+  const extras = await searchRenamedCourseResults(courseKey, cleanSubjectName, mainCourseCode);
+  const results = [...entry.results];
+  const seenIds = new Set(results.map((item) => item.id));
+
+  for (const extra of extras) {
+    if (!seenIds.has(extra.id)) {
+      seenIds.add(extra.id);
+      results.push(extra);
+    }
+  }
+
+  const sortedResults = sortResultsByRecency(results);
+  return {
+    ...entry,
+    results: sortedResults,
+    totalResults: entry.complete
+      ? sortedResults.length
+      : Math.max(entry.totalResults, sortedResults.length)
+  };
+}
+
 function memberSearchForPaper({ courseCode, title, year }) {
   if (courseCode) {
-    return { query: subjectKeyFromCourseCode(courseCode), year: "" };
+    return { query: librarySearchTitle(courseCode), year: "" };
   }
 
   return { query: normalizeText(String(title || "").split("[")[0]), year: year ? String(year) : "" };
@@ -670,8 +871,12 @@ async function resolvePaperUrl(paper) {
   return toLibraryUrl(match.downloadPath);
 }
 
-function searchCacheKey(query, year) {
-  return JSON.stringify([query.toLowerCase(), year]);
+function searchCacheKey(query, year, subjectName = "") {
+  return JSON.stringify([
+    query.toLowerCase(),
+    year,
+    String(subjectName || "").toLowerCase()
+  ]);
 }
 
 function arrayBufferToBase64(arrayBuffer) {
@@ -775,17 +980,23 @@ export async function getPyqCourseCatalog() {
   };
 }
 
-export async function searchLibraryPyqs({ query, year }) {
+export async function searchLibraryPyqs({ query, year, subjectName }) {
   const cleanQuery = normalizeText(query);
   const cleanYear = normalizeText(year);
+  const cleanSubjectName = normalizeText(subjectName);
   if (!cleanQuery) {
     throw new Error("Search query is required");
   }
 
-  const cacheKey = searchCacheKey(cleanQuery, cleanYear);
+  const cacheKey = searchCacheKey(cleanQuery, cleanYear, cleanSubjectName);
   const entry = await readCachedSearch(cacheKey)
     || await singleFlight(`search:${cacheKey}`, () => serializeLibraryRequest(async () => {
-      const freshEntry = await performLibrarySearch({ query: cleanQuery, year: cleanYear });
+      const mainEntry = await performLibrarySearch({ query: cleanQuery, year: cleanYear });
+      const freshEntry = await mergeRenamedCourseResults(mainEntry, {
+        query: cleanQuery,
+        year: cleanYear,
+        subjectName: cleanSubjectName
+      }).catch(() => mainEntry);
       await writeCachedSearch(cacheKey, freshEntry);
       return freshEntry;
     }));
@@ -793,9 +1004,10 @@ export async function searchLibraryPyqs({ query, year }) {
   return { ...entry, results: await attachPaperLinks(entry.results) };
 }
 
-export async function loadMoreLibraryPyqs({ query, year, cursor }) {
+export async function loadMoreLibraryPyqs({ query, year, subjectName, cursor }) {
   const cleanQuery = normalizeText(query);
   const cleanYear = normalizeText(year);
+  const cleanSubjectName = normalizeText(subjectName);
   if (!cleanQuery) {
     throw new Error("Search query is required");
   }
@@ -804,7 +1016,7 @@ export async function loadMoreLibraryPyqs({ query, year, cursor }) {
     throw new Error("No next page is available for this search");
   }
 
-  const cacheKey = searchCacheKey(cleanQuery, cleanYear);
+  const cacheKey = searchCacheKey(cleanQuery, cleanYear, cleanSubjectName);
   return singleFlight(`page:${cacheKey}:${cursor.viewState}`, () => serializeLibraryRequest(async () => {
     const page = readSearchPage(
       await fetchNextSearchPage({ query: cleanQuery, year: cleanYear, cursor }),
@@ -812,11 +1024,20 @@ export async function loadMoreLibraryPyqs({ query, year, cursor }) {
     );
 
     const cached = await readCachedSearch(cacheKey);
+    let totalResults = page.totalResults;
     if (cached?.nextCursor?.viewState === cursor.viewState) {
-      await writeCachedSearch(cacheKey, appendSearchPage(cached, page));
+      const merged = appendSearchPage(cached, page);
+      await writeCachedSearch(cacheKey, merged);
+      if (merged.complete && courseKeyFromQuery(cleanQuery)) {
+        totalResults = merged.results.length;
+      }
     }
 
-    return { ...page, results: await attachPaperLinks(page.results) };
+    return {
+      ...page,
+      totalResults,
+      results: await attachPaperLinks(page.results)
+    };
   }));
 }
 
@@ -845,7 +1066,7 @@ export async function openLibraryPyq(paper) {
 }
 
 export async function verifyCoursePaperLinks(courseCode) {
-  const query = subjectKeyFromCourseCode(courseCode);
+  const query = librarySearchTitle(courseCode);
   const entry = await serializeLibraryRequest(() => (
     performLibrarySearch({ query, year: "" }, { loadAllPages: true })
   ));

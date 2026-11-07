@@ -20,19 +20,21 @@ export const fetchPyqCatalog = () => {
   return sendRuntimeMessage({ action: "getPYQCourseCatalog" });
 };
 
-export const searchCoursePyqs = ({ query, year }) => {
+export const searchCoursePyqs = ({ query, year, subjectName }) => {
   return sendRuntimeMessage({
     action: "searchLibraryPyqs",
     query,
-    year
+    year,
+    subjectName
   });
 };
 
-export const loadMoreCoursePyqs = ({ query, year, cursor }) => {
+export const loadMoreCoursePyqs = ({ query, year, subjectName, cursor }) => {
   return sendRuntimeMessage({
     action: "loadMoreLibraryPyqs",
     query,
     year,
+    subjectName,
     cursor
   });
 };

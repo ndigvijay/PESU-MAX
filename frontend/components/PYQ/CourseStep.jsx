@@ -39,7 +39,11 @@ const CourseStep = () => {
   const handleSelectCourse = (course) => {
     dispatch(setSelectedCourse(course));
     dispatch(setCurrentStep("results"));
-    dispatch(searchPyqs({ query: course.searchCode || course.subjectName, year: ALL_PYQ_YEARS }));
+    dispatch(searchPyqs({
+      query: course.searchCode || course.subjectName,
+      year: ALL_PYQ_YEARS,
+      subjectName: course.subjectName
+    }));
   };
 
   return (

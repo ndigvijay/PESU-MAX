@@ -4,11 +4,37 @@ const PAPER_DIRECTORY = "digital/qp/";
 const FILE_FORMS = ["DL", "dl", "D", "", "DLL", "DLdl"];
 const SCHEME_PATTERN = /^[A-Z]{2}\d{2}(?=[A-Z])/;
 const FORM_SUFFIX_PATTERN = /(DLdl|DLL|DL|dl|D)$/;
+const COURSE_KEY_PATTERN = /^[A-Z]{2,4}\d{3}[A-Z0-9]{1,3}$/;
 
 export function subjectKeyFromCourseCode(courseCode) {
   const code = String(courseCode || "").trim().toUpperCase();
   const subjectKey = code.replace(SCHEME_PATTERN, "");
   return subjectKey.length >= 4 ? subjectKey : code;
+}
+
+export function courseKeyFromQuery(query) {
+  const cleaned = String(query || "").trim().toUpperCase().replace(/\)+$/, "");
+  if (!cleaned) {
+    return "";
+  }
+
+  const subjectKey = subjectKeyFromCourseCode(cleaned);
+  return COURSE_KEY_PATTERN.test(subjectKey) ? subjectKey : "";
+}
+
+export function librarySearchTitle(query) {
+  const courseKey = courseKeyFromQuery(query);
+  return courseKey ? `${courseKey})` : String(query || "");
+}
+
+export function subjectNameForCourseQuery(query, course) {
+  const queryKey = courseKeyFromQuery(query);
+  const courseKey = courseKeyFromQuery(course?.searchCode);
+  if (!queryKey || queryKey !== courseKey) {
+    return "";
+  }
+
+  return String(course?.subjectName || "").trim();
 }
 
 export function recordNumberFromId(recordId) {
