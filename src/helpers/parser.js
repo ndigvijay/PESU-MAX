@@ -581,6 +581,60 @@ const resolveTextContentImageSrc = (src) => {
   return src.startsWith('/Academy/') ? resolveDownloadUrl(src) : src;
 };
 
+const INLINE_IMAGE_MAX_HEIGHT_PT = 36;
+const PX_TO_PT = 0.75;
+
+const parseCssLengthInPoints = (value) => {
+  const match = /^\s*([\d.]+)\s*(pt|px)?\s*$/i.exec(String(value || ''));
+  if (!match) {
+    return null;
+  }
+
+  const amount = parseFloat(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return (match[2] || 'px').toLowerCase() === 'pt' ? amount : amount * PX_TO_PT;
+};
+
+const readStyleLength = (style, property) => {
+  const match = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`, 'i').exec(style || '');
+  return match ? parseCssLengthInPoints(match[1]) : null;
+};
+
+const readPngDataUriSize = (src) => {
+  const match = /^data:image\/png;base64,([A-Za-z0-9+/=]{32,})/i.exec(src || '');
+  if (!match) {
+    return null;
+  }
+
+  try {
+    const header = atob(match[1].slice(0, 32));
+    if (header.slice(12, 16) !== 'IHDR') {
+      return null;
+    }
+    const readUint32 = (offset) => ((header.charCodeAt(offset) << 24) >>> 0)
+      + (header.charCodeAt(offset + 1) << 16)
+      + (header.charCodeAt(offset + 2) << 8)
+      + header.charCodeAt(offset + 3);
+    const width = readUint32(16);
+    const height = readUint32(20);
+    return width > 0 && height > 0 ? { width: width * PX_TO_PT, height: height * PX_TO_PT } : null;
+  } catch {
+    return null;
+  }
+};
+
+const getInlineImageSize = ($image, src) => {
+  const style = $image.attr('style');
+  const width = readStyleLength(style, 'width') ?? parseCssLengthInPoints($image.attr('width'));
+  const height = readStyleLength(style, 'height') ?? parseCssLengthInPoints($image.attr('height'));
+  const size = width && height ? { width, height } : readPngDataUriSize(src);
+
+  return size && size.height <= INLINE_IMAGE_MAX_HEIGHT_PT ? size : null;
+};
+
 const normalizeInlineText = (value) => String(value || '')
   .replace(/\u00a0/g, ' ')
   .replace(/[ \t\r\n]+/g, ' ');
@@ -615,6 +669,13 @@ const trimParagraphRuns = (runs) => {
   return trimmed.filter((run) => run.image || (run.text && run.text.length > 0));
 };
 
+const tightenPunctuationAfterImages = (runs) => runs.map((run, index) => {
+  if (!run.text || !runs[index - 1]?.image) {
+    return run;
+  }
+  return { ...run, text: run.text.replace(/^[ \t]+(?=[,.;:?!)])/, '') };
+});
+
 export const parseTextContent = (htmlData) => {
   if (!htmlData || typeof htmlData !== 'string' || !htmlData.trim()) {
     return null;
@@ -640,12 +701,14 @@ export const parseTextContent = (htmlData) => {
     }
   });
 
-  const root = $('.content-type-area').first();
-  if (root.length === 0) {
+  const areas = $('.content-type-area')
+    .filter((index, element) => $(element).parents('.content-type-area').length === 0)
+    .toArray();
+  if (areas.length === 0) {
     return null;
   }
 
-  const rootElement = root.get(0);
+  const root = $(areas[0]);
   const titleElement = root.find('h4').first();
   const title = titleElement.length > 0 ? normalizeMathText(titleElement.text()) : '';
   if (titleElement.length > 0) {
@@ -656,7 +719,7 @@ export const parseTextContent = (htmlData) => {
   let runs = [];
 
   const pushParagraph = (paragraphRuns) => {
-    const finalRuns = trimParagraphRuns(paragraphRuns);
+    const finalRuns = tightenPunctuationAfterImages(trimParagraphRuns(paragraphRuns));
     if (finalRuns.some((run) => run.image || (run.text && run.text.trim()))) {
       blocks.push({ type: 'paragraph', runs: finalRuns });
     }
@@ -667,8 +730,13 @@ export const parseTextContent = (htmlData) => {
       return;
     }
 
+    const hasText = runs.some((run) => run.text && run.text.trim());
     let paragraphRuns = [];
     for (const run of runs) {
+      if (run.image && hasText && run.inlineSize) {
+        paragraphRuns.push({ image: run.image, width: run.inlineSize.width, height: run.inlineSize.height });
+        continue;
+      }
       if (run.image) {
         pushParagraph(paragraphRuns);
         paragraphRuns = [];
@@ -718,7 +786,7 @@ export const parseTextContent = (htmlData) => {
       if (childTag === 'img') {
         const src = resolveTextContentImageSrc($(child).attr('src'));
         if (src) {
-          addRun({ image: src });
+          addRun({ image: src, inlineSize: getInlineImageSize($(child), src) });
         }
         continue;
       }
@@ -760,7 +828,7 @@ export const parseTextContent = (htmlData) => {
       if (childTag === 'script' || childTag === 'style' || childTag === 'iframe') {
         continue;
       }
-      if ($(child).is('.content-type-area') && child !== rootElement) {
+      if ($(child).is('.content-type-area')) {
         flush();
         walk(child);
         continue;
@@ -810,8 +878,14 @@ export const parseTextContent = (htmlData) => {
     }
   };
 
-  walk(rootElement);
-  flush();
+  areas.forEach((area, index) => {
+    const firstBlockIndex = blocks.length;
+    walk(area);
+    flush();
+    if (index > 0 && blocks[firstBlockIndex]) {
+      blocks[firstBlockIndex].sectionBreak = true;
+    }
+  });
 
   const hasMeaningfulContent = blocks.some((block) => block.type === 'image'
     || (block.runs || []).some((run) => run.text && run.text.trim()));

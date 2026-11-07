@@ -12,6 +12,8 @@ const BODY_LINE_HEIGHT = 15.4;
 const SCRIPT_SIZE = 7.5;
 const SCRIPT_SHIFT = 3.5;
 const PARAGRAPH_GAP = 8;
+const SECTION_GAP = 10;
+const INLINE_IMAGE_DROP = 3;
 const TITLE_SIZE = 15;
 const TITLE_LINE_HEIGHT = 21;
 const FOOTER_Y = 30;
@@ -65,6 +67,10 @@ const tokenizeRuns = (runs) => {
   const tokens = [];
 
   for (const run of runs) {
+    if (run.image) {
+      tokens.push({ image: run.image, width: run.width, height: run.height });
+      continue;
+    }
     if (!run.text) {
       continue;
     }
@@ -176,13 +182,11 @@ export async function buildTextContentPdf(content, { regularFontBytes, boldFontB
   const pages = [];
   let page;
   let cursorY = PAGE_HEIGHT - MARGIN;
-  let lineWidth = 0;
 
   const addPage = () => {
     page = pdfDocument.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     pages.push(page);
     cursorY = PAGE_HEIGHT - MARGIN;
-    lineWidth = 0;
   };
 
   const ensureSpace = (height) => {
@@ -191,34 +195,164 @@ export async function buildTextContentPdf(content, { regularFontBytes, boldFontB
     }
   };
 
-  const drawParagraphText = (token) => {
-    const font = token.bold ? boldFont : regularFont;
-    const characters = token.bold ? boldCharacters : regularCharacters;
-    const size = token.sup || token.sub ? SCRIPT_SIZE : BODY_SIZE;
-    const yOffset = token.sup ? SCRIPT_SHIFT : token.sub ? -SCRIPT_SHIFT : 0;
-    const text = sanitizeText(token.text, characters);
-    const width = font.widthOfTextAtSize(text, size);
+  const embedImage = async (src) => {
+    let imageData = splitDataUri(src);
 
-    page.drawText(text, {
-      x: MARGIN + lineWidth,
-      y: cursorY - BODY_SIZE + yOffset,
-      size,
-      font,
-      color: rgb(0, 0, 0),
-    });
+    if (!imageData && loadImage) {
+      try {
+        imageData = await loadImage(src);
+      } catch (error) {
+        if (error?.isSessionExpired) {
+          throw error;
+        }
+        imageData = null;
+      }
+    }
 
-    lineWidth += width;
-  };
+    if (!imageData?.bytes) {
+      return null;
+    }
 
-  const beginLine = () => {
-    lineWidth = 0;
-    if (!page || cursorY - BODY_LINE_HEIGHT < MARGIN) {
-      addPage();
+    try {
+      return imageData.type === 'png'
+        ? await pdfDocument.embedPng(imageData.bytes)
+        : await pdfDocument.embedJpg(imageData.bytes);
+    } catch {
+      return null;
     }
   };
 
-  const endLine = () => {
-    cursorY -= BODY_LINE_HEIGHT;
+  const layoutParagraph = async (tokens) => {
+    const lines = [];
+    let line;
+
+    const startLine = () => {
+      line = { items: [], width: 0, imageHeight: 0 };
+      lines.push(line);
+    };
+
+    const addText = (text, { bold, sup, sub }, font = bold ? boldFont : regularFont, color = rgb(0, 0, 0)) => {
+      const size = sup || sub ? SCRIPT_SIZE : BODY_SIZE;
+      const width = font.widthOfTextAtSize(text, size);
+      line.items.push({
+        text,
+        font,
+        size,
+        color,
+        x: line.width,
+        yOffset: sup ? SCRIPT_SHIFT : sub ? -SCRIPT_SHIFT : 0,
+      });
+      line.width += width;
+    };
+
+    startLine();
+
+    for (const token of tokens) {
+      if (token.newline) {
+        startLine();
+        continue;
+      }
+
+      if (token.image) {
+        const embeddedImage = await embedImage(token.image);
+        if (!embeddedImage) {
+          const placeholder = '[image]';
+          const placeholderWidth = placeholderFont.widthOfTextAtSize(placeholder, BODY_SIZE);
+          if (line.width > 0 && line.width + placeholderWidth > CONTENT_WIDTH) {
+            startLine();
+          }
+          addText(placeholder, {}, placeholderFont, GRAY);
+          continue;
+        }
+
+        const fitScale = Math.min(1, CONTENT_WIDTH / token.width);
+        const width = token.width * fitScale;
+        const height = token.height * fitScale;
+        if (line.width > 0 && line.width + width > CONTENT_WIDTH) {
+          startLine();
+        }
+        line.items.push({ image: embeddedImage, x: line.width, width, height });
+        line.width += width;
+        line.imageHeight = Math.max(line.imageHeight, height);
+        continue;
+      }
+
+      const font = token.bold ? boldFont : regularFont;
+      const characters = token.bold ? boldCharacters : regularCharacters;
+      const size = token.sup || token.sub ? SCRIPT_SIZE : BODY_SIZE;
+
+      if (token.space) {
+        if (line.width > 0 && line.width + font.widthOfTextAtSize(' ', size) <= CONTENT_WIDTH) {
+          addText(' ', token);
+        }
+        continue;
+      }
+
+      const sanitizedWord = sanitizeText(token.text, characters);
+
+      if (font.widthOfTextAtSize(sanitizedWord, size) > CONTENT_WIDTH) {
+        if (line.width > 0) {
+          startLine();
+        }
+
+        let chunk = '';
+        for (const char of sanitizedWord) {
+          const nextChunk = chunk + char;
+          if (font.widthOfTextAtSize(nextChunk, size) > CONTENT_WIDTH && chunk) {
+            addText(chunk, token);
+            startLine();
+            chunk = char;
+          } else {
+            chunk = nextChunk;
+          }
+        }
+
+        if (chunk) {
+          addText(chunk, token);
+        }
+        continue;
+      }
+
+      if (line.width > 0 && line.width + font.widthOfTextAtSize(sanitizedWord, size) > CONTENT_WIDTH) {
+        startLine();
+      }
+
+      addText(sanitizedWord, token);
+    }
+
+    return lines;
+  };
+
+  const drawLine = (line) => {
+    const ascent = Math.max(BODY_SIZE, line.imageHeight - INLINE_IMAGE_DROP);
+    const lineHeight = ascent + BODY_LINE_HEIGHT - BODY_SIZE;
+
+    if (!page || cursorY - lineHeight < MARGIN) {
+      addPage();
+    }
+
+    const baselineY = cursorY - ascent;
+    for (const item of line.items) {
+      if (item.image) {
+        page.drawImage(item.image, {
+          x: MARGIN + item.x,
+          y: baselineY - INLINE_IMAGE_DROP,
+          width: item.width,
+          height: item.height,
+        });
+        continue;
+      }
+
+      page.drawText(item.text, {
+        x: MARGIN + item.x,
+        y: baselineY + item.yOffset,
+        size: item.size,
+        font: item.font,
+        color: item.color,
+      });
+    }
+
+    cursorY -= lineHeight;
   };
 
   addPage();
@@ -250,30 +384,12 @@ export async function buildTextContentPdf(content, { regularFontBytes, boldFontB
   }
 
   for (const block of content.blocks || []) {
+    if (block.sectionBreak) {
+      cursorY -= SECTION_GAP;
+    }
+
     if (block.type === 'image') {
-      let imageData = splitDataUri(block.src);
-
-      if (!imageData && loadImage) {
-        try {
-          imageData = await loadImage(block.src);
-        } catch (error) {
-          if (error?.isSessionExpired) {
-            throw error;
-          }
-          imageData = null;
-        }
-      }
-
-      let embeddedImage = null;
-      if (imageData?.bytes) {
-        try {
-          embeddedImage = imageData.type === 'png'
-            ? await pdfDocument.embedPng(imageData.bytes)
-            : await pdfDocument.embedJpg(imageData.bytes);
-        } catch {
-          embeddedImage = null;
-        }
-      }
+      const embeddedImage = await embedImage(block.src);
 
       if (!embeddedImage) {
         ensureSpace(14);
@@ -306,67 +422,8 @@ export async function buildTextContentPdf(content, { regularFontBytes, boldFontB
       continue;
     }
 
-    beginLine();
-
-    const tokens = tokenizeRuns(block.runs || []);
-
-    for (const token of tokens) {
-      if (token.newline) {
-        endLine();
-        beginLine();
-        continue;
-      }
-
-      const font = token.bold ? boldFont : regularFont;
-      const characters = token.bold ? boldCharacters : regularCharacters;
-      const size = token.sup || token.sub ? SCRIPT_SIZE : BODY_SIZE;
-
-      if (token.space) {
-        if (lineWidth > 0) {
-          const spaceWidth = font.widthOfTextAtSize(' ', size);
-          if (lineWidth + spaceWidth <= CONTENT_WIDTH) {
-            drawParagraphText({ text: ' ', bold: token.bold, sup: token.sup, sub: token.sub });
-          }
-        }
-        continue;
-      }
-
-      const sanitizedWord = sanitizeText(token.text, characters);
-
-      if (font.widthOfTextAtSize(sanitizedWord, size) > CONTENT_WIDTH) {
-        if (lineWidth > 0) {
-          endLine();
-          beginLine();
-        }
-
-        let chunk = '';
-        for (const char of sanitizedWord) {
-          const nextChunk = chunk + char;
-          if (font.widthOfTextAtSize(nextChunk, size) > CONTENT_WIDTH && chunk) {
-            drawParagraphText({ text: chunk, bold: token.bold, sup: token.sup, sub: token.sub });
-            endLine();
-            beginLine();
-            chunk = char;
-          } else {
-            chunk = nextChunk;
-          }
-        }
-
-        if (chunk) {
-          drawParagraphText({ text: chunk, bold: token.bold, sup: token.sup, sub: token.sub });
-        }
-        continue;
-      }
-
-      if (lineWidth > 0 && lineWidth + font.widthOfTextAtSize(sanitizedWord, size) > CONTENT_WIDTH) {
-        endLine();
-        beginLine();
-      }
-
-      drawParagraphText({ text: sanitizedWord, bold: token.bold, sup: token.sup, sub: token.sub });
-    }
-
-    endLine();
+    const lines = await layoutParagraph(tokenizeRuns(block.runs || []));
+    lines.forEach(drawLine);
     cursorY -= PARAGRAPH_GAP;
   }
 
@@ -382,7 +439,10 @@ export async function buildTextContentPdf(content, { regularFontBytes, boldFontB
 
 const runsToHtml = (runs) => (runs || []).map((run) => {
   if (run.image) {
-    return `<img src="${escapeHtml(run.image)}" alt="" />`;
+    const size = run.width && run.height
+      ? ` style="width:${run.width}pt; height:${run.height}pt; vertical-align:-${INLINE_IMAGE_DROP}pt"`
+      : '';
+    return `<img src="${escapeHtml(run.image)}" alt=""${size} />`;
   }
 
   let text = escapeHtml(run.text).replace(/\n/g, '<br />');
@@ -403,7 +463,8 @@ export function buildTextContentHtml(content) {
     if (block.type === 'image') {
       return `<p class="image"><img src="${escapeHtml(block.src)}" alt="" /></p>`;
     }
-    return `<p>${runsToHtml(block.runs)}</p>`;
+    const sectionStyle = block.sectionBreak ? ' class="section"' : '';
+    return `<p${sectionStyle}>${runsToHtml(block.runs)}</p>`;
   }).join('\n');
 
   return `<!DOCTYPE html>
@@ -416,6 +477,7 @@ export function buildTextContentHtml(content) {
 body { font-family: Georgia, "Times New Roman", serif; margin: 40px auto; max-width: 760px; padding: 0 20px; color: #111; line-height: 1.6; }
 h1 { font-size: 22px; margin-bottom: 10px; }
 p { margin: 0 0 12px; }
+p.section { margin-top: 28px; }
 img { max-width: 100%; height: auto; }
 </style>
 </head>
