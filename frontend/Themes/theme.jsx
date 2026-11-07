@@ -15,6 +15,7 @@ const theme = {
     secondaryBorder: token("border"),
     secondaryBorderHover: token("border-strong"),
     secondaryOutline: token("outline"),
+    cardBorder: token("card-border"),
     solid: token("solid"),
     solidHover: token("solid-hover"),
     surface: token("surface"),

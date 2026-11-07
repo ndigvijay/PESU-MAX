@@ -267,7 +267,7 @@ export const settingsRowSx = {
   justifyContent: 'space-between',
   gap: '10px',
   padding: '10px 12px',
-  border: `1.5px solid ${theme.colors.secondaryBorder}`,
+  border: `1.5px solid ${theme.colors.cardBorder}`,
   borderRadius: '12px',
 };
 
@@ -321,7 +321,7 @@ export const settingsGroupSx = {
   position: 'relative',
   overflow: 'hidden',
   padding: '8px',
-  border: `1.5px solid ${theme.colors.secondaryBorder}`,
+  border: `1.5px solid ${theme.colors.cardBorder}`,
   borderRadius: '14px',
   backgroundColor: theme.colors.secondaryLight,
 };
