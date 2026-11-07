@@ -171,6 +171,16 @@ const Home = () => {
               Star on GitHub
             </Button>
           </Box>
+          <Link
+            component="button"
+            type="button"
+            underline="hover"
+            variant="body2"
+            onClick={() => dispatch(setCurrentPage("changelog"))}
+            sx={{ ...footerLinkSx, alignSelf: 'center' }}
+          >
+            What's new
+          </Link>
         </Box>
         <Box
           sx={{
