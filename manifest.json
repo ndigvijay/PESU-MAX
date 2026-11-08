@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "88",
   "name": "PESU-MAX",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "action": {
     "default_popup": "src/popup/index.html"
   },
