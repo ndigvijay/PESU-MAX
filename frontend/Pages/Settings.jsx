@@ -1,8 +1,12 @@
 import React, { useState, useSyncExternalStore } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { Box, Typography, IconButton, Stack } from "@mui/material";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import { closeSidebar, setCurrentPage } from "../redux/sidebarSlice.js";
+import {
+  testNotificationThunk,
+  updateDeadlineSettingsThunk,
+} from "../redux/deadlinesSlice.js";
 import theme from "../Themes/theme.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
@@ -11,6 +15,7 @@ import SettingsSection from "../components/Settings/SettingsSection.jsx";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
 import MaterialColumnsDialog from "../components/CourseMaterial/MaterialColumnsDialog.jsx";
 import DockSectionsDialog from "../components/SideMenuDock/DockSectionsDialog.jsx";
+import DeadlineSettingsDialog from "../components/Deadlines/DeadlineSettingsDialog.jsx";
 import { settingsHintSx, settingsWarningSx } from "../styles/styles.js";
 import {
   getMenuReorderSnapshot,
@@ -43,6 +48,8 @@ const Settings = () => {
   const dispatch = useDispatch();
   const [materialColumnsOpen, setMaterialColumnsOpen] = useState(false);
   const [dockSectionsOpen, setDockSectionsOpen] = useState(false);
+  const [deadlineSettingsOpen, setDeadlineSettingsOpen] = useState(false);
+  const deadlineSettings = useSelector((state) => state.deadlines.settings);
   const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Side menu style");
   const dockOn = dock.ready && dock.value === true;
   const classicOn = dock.ready && dock.value !== true;
@@ -183,6 +190,15 @@ const Settings = () => {
           </SettingsSection>
         </SettingsSection>
 
+        <SettingsSection title="Deadlines">
+          <SettingsEditRow
+            title="Assignment reminders"
+            description="Configure browser notifications and lead times for assignment due dates."
+            onClick={() => setDeadlineSettingsOpen(true)}
+            label="Configure"
+          />
+        </SettingsSection>
+
         <SettingsSection title="Advanced">
           <SettingsSelectRow
             storageKey={MERGE_MODE_KEY}
@@ -199,6 +215,14 @@ const Settings = () => {
       />
 
       <DockSectionsDialog open={dockSectionsOpen} onClose={() => setDockSectionsOpen(false)} />
+
+      <DeadlineSettingsDialog
+        open={deadlineSettingsOpen}
+        onClose={() => setDeadlineSettingsOpen(false)}
+        settings={deadlineSettings}
+        onSaveSettings={(nextSettings) => dispatch(updateDeadlineSettingsThunk(nextSettings))}
+        onTestNotification={() => dispatch(testNotificationThunk()).unwrap()}
+      />
     </Box>
   );
 };

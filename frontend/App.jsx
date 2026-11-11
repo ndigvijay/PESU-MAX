@@ -1,15 +1,45 @@
 import { useEffect, useState } from "react";
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
-import { Provider } from "react-redux";
+import { Provider, useDispatch } from "react-redux";
 import { store } from "./redux/store.jsx";
 import Sidebar from "./components/SideBar.jsx";
 import CircularButton from "./components/CircularButton.jsx";
 import { PESU_SESSION_EXPIRED_KEY } from "../src/helpers/pesuAPI.js";
 import { ACADEMY_APP_PATH_PREFIX } from "../src/content/academyPage.js";
+import { loadDeadlines } from "./redux/deadlinesSlice.js";
+import { openSidebar, setCurrentPage } from "./redux/sidebarSlice.js";
+import { subscribeToDeadlines } from "../src/services/deadlineService.js";
 import theme from "./Themes/theme.jsx";
 import { dialogPaperSx } from "./styles/styles.js";
 
 const isSignedInPage = () => window.location.pathname.startsWith(ACADEMY_APP_PATH_PREFIX);
+
+const DeadlinesSyncBridge = () => {
+    const dispatch = useDispatch();
+
+    useEffect(() => {
+        if (!isSignedInPage()) return undefined;
+        dispatch(loadDeadlines());
+        const unsubscribe = subscribeToDeadlines(() => {
+            dispatch(loadDeadlines());
+        });
+
+        const messageListener = (message) => {
+            if (message?.action === "openDeadlinesPage") {
+                dispatch(openSidebar());
+                dispatch(setCurrentPage("deadlines"));
+            }
+        };
+        chrome.runtime.onMessage.addListener(messageListener);
+
+        return () => {
+            unsubscribe();
+            chrome.runtime.onMessage.removeListener(messageListener);
+        };
+    }, [dispatch]);
+
+    return null;
+};
 
 const App = () => {
     const [sessionExpired, setSessionExpired] = useState(false);
@@ -42,6 +72,7 @@ const App = () => {
 
     return (
         <Provider store={store}>
+            <DeadlinesSyncBridge />
             <CircularButton/>
             <Sidebar/>
             <Dialog

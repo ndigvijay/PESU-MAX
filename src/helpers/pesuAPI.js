@@ -433,3 +433,88 @@ export const getCourseMaterials = async (courseId, unitId, classId, classNo, con
     
     return { type: 'html', data: await response.text() };
 };
+
+export const parseDispositionFilename = (contentDisposition = "") => {
+  const match = String(contentDisposition).match(/filename[*]?=["']?(?:UTF-8'')?([^"';\n]+)/i);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1].trim());
+  } catch {
+    return match[1].trim();
+  }
+};
+
+export const getAssignmentMaterialsMeta = async (courseId, unitId, classId, classNo) => {
+  const csrfToken = await getCsrfToken();
+  const headers = {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "X-Requested-With": "XMLHttpRequest"
+  };
+
+  if (csrfToken) {
+    headers["X-CSRF-TOKEN"] = csrfToken;
+  }
+
+  const viewParams = new URLSearchParams({
+    controllerMode: "6403",
+    actionType: "44",
+    courseunitid: String(classId),
+    subjectid: String(courseId),
+    coursecontentid: String(unitId),
+    classNo: String(classNo),
+    type: String(CONTENT_TYPE_IDS.assignments),
+    menuId: "653",
+    subType: "2",
+    _: String(Date.now())
+  });
+
+  const viewResponse = await fetchPesu(`${BASE_URL}/s/studentProfilePESUAdmin?${viewParams.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers
+  });
+
+  if (!viewResponse.ok) {
+    throw new Error(`Failed to load assignment view: ${viewResponse.status}`);
+  }
+
+  const viewHtml = await viewResponse.text();
+
+  const params = new URLSearchParams({
+    controllerMode: "6403",
+    actionType: "60",
+    selectedData: String(courseId),
+    id: String(CONTENT_TYPE_IDS.assignments),
+    unitid: String(classId),
+    coursecontentid: String(unitId),
+    classno: String(classNo),
+    menuId: "653",
+    subType: "2",
+    _: String(Date.now())
+  });
+
+  const response = await fetchPesu(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch assignment content: ${response.status}`);
+  }
+
+  const responseContentType = response.headers.get("Content-Type") || "";
+  const filename = parseDispositionFilename(response.headers.get("Content-Disposition") || "");
+
+  if (
+    responseContentType.includes("application/pdf") ||
+    responseContentType.includes("application/octet-stream") ||
+    responseContentType.includes("application/vnd")
+  ) {
+    await response.body?.cancel?.().catch(() => {});
+    return { viewHtml, contentHtml: "", filename, contentType: responseContentType };
+  }
+
+  const contentHtml = await response.text();
+  return { viewHtml, contentHtml, filename, contentType: responseContentType };
+};

@@ -157,6 +157,7 @@ export const parseUnitClasses = (data) => {
 
     const contentTypes = [];
     const resourceCounts = {};
+    let assignmentDueHint = "";
     $(row).find('[onclick*="handleclasscoursecontentunit"]').each((linkIndex, link) => {
       const onclick = $(link).attr('onclick') || '';
       const match = onclick.match(/handleclasscoursecontentunit\s*\([^,]+,[^,]+,[^,]+,[^,]+,\s*(\d+)/i);
@@ -168,6 +169,12 @@ export const parseUnitClasses = (data) => {
         const count = parseInt($(link).find('a').first().text().replace(/\D+/g, ' ').trim(), 10);
         resourceCounts[type] = Number.isInteger(count) ? count : 0;
       }
+      if (type === 5) {
+        const titleHint = $(link).attr('title') || $(link).find('a').first().attr('title') || $(link).attr('data-due-date') || "";
+        if (titleHint && titleHint.trim()) {
+          assignmentDueHint = titleHint.replace(/\s+/g, ' ').trim();
+        }
+      }
     });
 
     classes.push({
@@ -178,7 +185,8 @@ export const parseUnitClasses = (data) => {
       className,
       classType: 'Lecture',
       contentTypes,
-      resourceCounts
+      resourceCounts,
+      ...(assignmentDueHint ? { assignmentDueHint } : {})
     });
   });
   

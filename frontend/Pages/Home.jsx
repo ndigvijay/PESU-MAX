@@ -5,6 +5,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import { useDispatch } from "react-redux";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
 import theme from "../Themes/theme.jsx";
+import DeadlinesWidget from "../components/Deadlines/DeadlinesWidget.jsx";
 
 const footerLinkSx = {
   color: theme.colors.secondary,
@@ -64,6 +65,7 @@ const Home = () => {
             </Typography>
             </>
           )}
+          {isLoggedIn && <DeadlinesWidget />}
           {isLoggedIn && (<Button
             variant="contained"
             sx={{

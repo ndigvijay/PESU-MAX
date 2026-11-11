@@ -6,6 +6,7 @@ import attendanceReducer from './attendanceSlice.js';
 import gpaReducer from './gpaSlice.js';
 import pyqReducer from './pyqSlice.js';
 import notificationsReducer from './notificationsSlice.js';
+import deadlinesReducer from './deadlinesSlice.js';
 
 const store = configureStore({
     reducer : {
@@ -15,7 +16,8 @@ const store = configureStore({
         attendance: attendanceReducer,
         gpa: gpaReducer,
         pyq: pyqReducer,
-        notifications: notificationsReducer
+        notifications: notificationsReducer,
+        deadlines: deadlinesReducer
     }
 })
 

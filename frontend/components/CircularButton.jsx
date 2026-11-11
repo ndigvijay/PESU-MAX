@@ -1,13 +1,17 @@
 import React, { useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Box } from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import { toggleSidebar } from "../redux/sidebarSlice.js";
+import { selectDeadlinesSummary } from "../redux/deadlinesSlice.js";
 import theme from "../Themes/theme.jsx";
 import PesuMaxMark from "./PesuMaxMark.jsx";
 
 const CircularButton = () => {
   const dispatch = useDispatch();
   const isOpen = useSelector((state) => state.sidebar.isOpen);
+  const deadlineSummary = useSelector(selectDeadlinesSummary);
+  const urgentCount = deadlineSummary?.badgeCount || 0;
   const [topPosition, setTopPosition] = useState(20);
   const isDragging = useRef(false);
   const dragStartY = useRef(0);
@@ -79,6 +83,32 @@ const CircularButton = () => {
             }}
           >
             <PesuMaxMark size="100%" />
+            {urgentCount > 0 && (
+              <Box
+                aria-label={`${urgentCount} urgent deadline${urgentCount > 1 ? "s" : ""}`}
+                sx={{
+                  position: "absolute",
+                  top: "-4px",
+                  right: "-4px",
+                  minWidth: "20px",
+                  height: "20px",
+                  padding: "0 5px",
+                  borderRadius: "999px",
+                  backgroundColor:
+                    deadlineSummary.overdueCount > 0 ? theme.colors.danger : theme.colors.primary,
+                  color: theme.colors.onPrimary,
+                  border: `2px solid ${theme.colors.surface}`,
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  lineHeight: "16px",
+                  textAlign: "center",
+                  pointerEvents: "none",
+                  boxShadow: theme.colors.shadowSoft,
+                }}
+              >
+                {urgentCount > 99 ? "99+" : urgentCount}
+              </Box>
+            )}
           </IconButton>
         </>
       )}

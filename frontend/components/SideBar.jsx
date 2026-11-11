@@ -15,8 +15,10 @@ import Settings from '../Pages/Settings.jsx';
 import Appearance from '../Pages/Appearance.jsx';
 import Notifications from '../Pages/Notifications.jsx';
 import Changelog from '../Pages/Changelog.jsx';
+import Deadlines from '../Pages/Deadlines.jsx';
 import SettingsIcon from '@mui/icons-material/Settings';
 import ResourceNotificationsButton from './Notifications/ResourceNotificationsButton.jsx';
+import DeadlinesButton from './Deadlines/DeadlinesButton.jsx';
 
 
 
@@ -80,8 +82,9 @@ const Sidebar = () => {
                             PESU-MAX
                         </Typography>
                     </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "2px" }}>
                         <ThemeModeButton />
+                        <DeadlinesButton />
                         <ResourceNotificationsButton />
                         <IconButton onClick={HandleSettings} aria-label="Open settings" size="large" sx={{ color: theme.colors.secondary }}>
                             <SettingsIcon fontSize="large" />
@@ -120,6 +123,7 @@ const Sidebar = () => {
                     {currentPage === "settings" && <Settings />}
                     {currentPage === "appearance" && <Appearance />}
                     {currentPage === "notifications" && <Notifications />}
+                    {currentPage === "deadlines" && <Deadlines />}
                     {currentPage === "changelog" && <Changelog />}
                 </Box>
 

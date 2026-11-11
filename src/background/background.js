@@ -15,6 +15,17 @@ import {
   openLibraryPyq,
   searchLibraryPyqs
 } from "../services/libraryPyq.js";
+import {
+  deleteDeadlineItem,
+  downloadAssignmentFile,
+  getAllDeadlinesPayload,
+  initializeDeadlineTracker,
+  saveCustomDeadline,
+  sendTestDeadlineNotification,
+  syncDeadlinesWithAcademy,
+  updateDeadlineItem,
+  updateDeadlineSettings
+} from "../initalizers/deadlineCheck.js";
 
 // get from storage and send to frontend
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -195,7 +206,65 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => sendResponse({ error: error.message }));
     return true;
   }
+
+  if (request.action === "getDeadlines") {
+    getAllDeadlinesPayload()
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "syncDeadlines") {
+    syncDeadlinesWithAcademy({ force: Boolean(request.force) })
+      .then((items) => getAllDeadlinesPayload().then((payload) => ({ ...payload, items })))
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "saveCustomDeadline") {
+    saveCustomDeadline(request.deadline || {})
+      .then((items) => sendResponse({ data: { items } }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "updateDeadline") {
+    updateDeadlineItem(request.id, request.patch || {})
+      .then((items) => sendResponse({ data: { items } }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "deleteDeadline") {
+    deleteDeadlineItem(request.id)
+      .then((items) => sendResponse({ data: { items } }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "updateDeadlineSettings") {
+    updateDeadlineSettings(request.settings || {})
+      .then((settings) => sendResponse({ data: { settings } }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "testDeadlineNotification") {
+    sendTestDeadlineNotification()
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (request.action === "downloadDeadlineFile") {
+    downloadAssignmentFile(request.file || {})
+      .then((data) => sendResponse({ data }))
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
 });
 
 // Initialize data sync with alarms
 initializeDataSync();
+initializeDeadlineTracker();
