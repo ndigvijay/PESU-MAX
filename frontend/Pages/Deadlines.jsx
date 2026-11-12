@@ -65,6 +65,7 @@ const Deadlines = () => {
     syncing,
     saving,
     error,
+    workerWarning,
   } = useSelector((state) => state.deadlines);
 
   const scopedItems = useSelector(selectScopedDeadlines);
@@ -113,12 +114,20 @@ const Deadlines = () => {
 
   const handleSync = async () => {
     try {
-      await dispatch(syncDeadlinesThunk(true)).unwrap();
-      setSnackbar({
-        open: true,
-        message: "Synced assignments from PESU Academy",
-        severity: "success",
-      });
+      const result = await dispatch(syncDeadlinesThunk(true)).unwrap();
+      if (result?.workerWarning) {
+        setSnackbar({
+          open: true,
+          message: "Loaded cached assignments locally; reload the extension for full HTML scan",
+          severity: "warning",
+        });
+      } else {
+        setSnackbar({
+          open: true,
+          message: "Synced assignments from PESU Academy",
+          severity: "success",
+        });
+      }
     } catch (err) {
       setSnackbar({
         open: true,
@@ -381,6 +390,12 @@ const Deadlines = () => {
           />
         )}
       </Box>
+
+      {workerWarning && (
+        <Alert severity="warning" sx={{ fontSize: "11.5px", padding: "2px 10px" }}>
+          {workerWarning}
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ fontSize: "12px", padding: "2px 10px" }}>

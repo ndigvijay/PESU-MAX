@@ -14,14 +14,12 @@ import { computeBadgeSummary, getDeadlineStatus } from "../../src/helpers/deadli
 export const loadDeadlines = createAsyncThunk(
   "deadlines/loadDeadlines",
   async (_, { rejectWithValue }) => {
+    const courseOptions = await getEnrolledCourseOptions().catch(() => []);
     try {
-      const [payload, courseOptions] = await Promise.all([
-        getDeadlines(),
-        getEnrolledCourseOptions(),
-      ]);
+      const payload = await getDeadlines();
       return { ...payload, courseOptions };
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue({ message: error.message, courseOptions });
     }
   }
 );
@@ -115,6 +113,7 @@ const deadlinesSlice = createSlice({
     syncing: false,
     saving: false,
     error: null,
+    workerWarning: null,
   },
   reducers: {
     setDeadlineFilter: (state, action) => {
@@ -128,6 +127,7 @@ const deadlinesSlice = createSlice({
     },
     clearDeadlineError: (state) => {
       state.error = null;
+      state.workerWarning = null;
     },
   },
   extraReducers: (builder) => {
@@ -142,6 +142,7 @@ const deadlinesSlice = createSlice({
         state.items = action.payload.items || [];
         state.settings = action.payload.settings || state.settings;
         state.syncStatus = action.payload.syncStatus || state.syncStatus;
+        state.workerWarning = action.payload.workerWarning || null;
         if (action.payload.courseOptions) {
           state.courseOptions = action.payload.courseOptions;
         }
@@ -149,7 +150,14 @@ const deadlinesSlice = createSlice({
       .addCase(loadDeadlines.rejected, (state, action) => {
         state.loading = false;
         state.ready = true;
-        state.error = action.payload || "Could not load deadlines.";
+        if (action.payload && typeof action.payload === "object") {
+          state.error = action.payload.message || "Could not load deadlines.";
+          if (action.payload.courseOptions) {
+            state.courseOptions = action.payload.courseOptions;
+          }
+        } else {
+          state.error = action.payload || "Could not load deadlines.";
+        }
       })
       .addCase(syncDeadlinesThunk.pending, (state) => {
         state.syncing = true;
@@ -161,6 +169,7 @@ const deadlinesSlice = createSlice({
         state.items = action.payload.items || [];
         state.settings = action.payload.settings || state.settings;
         state.syncStatus = action.payload.syncStatus || state.syncStatus;
+        state.workerWarning = action.payload.workerWarning || null;
       })
       .addCase(syncDeadlinesThunk.rejected, (state, action) => {
         state.syncing = false;
@@ -173,6 +182,7 @@ const deadlinesSlice = createSlice({
       .addCase(saveCustomDeadlineThunk.fulfilled, (state, action) => {
         state.saving = false;
         state.items = action.payload.items || [];
+        state.workerWarning = action.payload.workerWarning || null;
       })
       .addCase(saveCustomDeadlineThunk.rejected, (state, action) => {
         state.saving = false;
@@ -185,6 +195,7 @@ const deadlinesSlice = createSlice({
       .addCase(updateDeadlineThunk.fulfilled, (state, action) => {
         state.saving = false;
         state.items = action.payload.items || [];
+        state.workerWarning = action.payload.workerWarning || null;
       })
       .addCase(updateDeadlineThunk.rejected, (state, action) => {
         state.saving = false;
@@ -192,12 +203,14 @@ const deadlinesSlice = createSlice({
       })
       .addCase(deleteDeadlineThunk.fulfilled, (state, action) => {
         state.items = action.payload.items || [];
+        state.workerWarning = action.payload.workerWarning || null;
       })
       .addCase(deleteDeadlineThunk.rejected, (state, action) => {
         state.error = action.payload || "Could not delete deadline.";
       })
       .addCase(updateDeadlineSettingsThunk.fulfilled, (state, action) => {
         state.settings = action.payload.settings || state.settings;
+        state.workerWarning = action.payload.workerWarning || null;
       })
       .addCase(updateDeadlineSettingsThunk.rejected, (state, action) => {
         state.error = action.payload || "Could not update notification settings.";

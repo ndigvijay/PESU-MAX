@@ -20,15 +20,21 @@ import { parallelBatch } from "../helpers/MiscControllers.js";
 import { blobToDataUrl } from "../helpers/blobEncoding.js";
 import {
   DAY_MS,
+  DEFAULT_DEADLINE_SETTINGS,
   HOUR_MS,
   computeBadgeSummary,
-  extractCachedAssignmentsFromPesuData,
+  mergePesuDataIntoStore,
+  resolveCurrentSemesterNumber,
+  sanitizeDeadlineSettings,
+  sortDeadlines,
+  isActiveForBadge,
+} from "../helpers/deadlineUtils.js";
+import {
   extractDeadlineFromHtml,
   extractDeadlineFromText,
-  isActiveForBadge,
-  resolveCurrentSemesterNumber,
-  sortDeadlines,
 } from "../helpers/deadlineParser.js";
+
+export { DEFAULT_DEADLINE_SETTINGS };
 
 export const DEADLINE_CHECK_ALARM = "checkAssignmentDeadlines";
 export const DEADLINE_SYNC_ALARM = "syncAssignmentDeadlines";
@@ -41,12 +47,6 @@ const CLASS_RESCAN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const MAX_SCHEDULED_REMINDERS = 50;
 const MAX_NOTIFIED_ENTRIES = 500;
 
-export const DEFAULT_DEADLINE_SETTINGS = {
-  notificationsEnabled: true,
-  leadHours: [24, 6, 1],
-  overdueReminder: true,
-};
-
 let storeLockChain = Promise.resolve();
 let academySyncInFlight = null;
 
@@ -56,21 +56,9 @@ function withDeadlinesStoreLock(fn) {
   return run;
 }
 
-function sanitizeSettings(raw) {
-  const leadHours = Array.isArray(raw?.leadHours)
-    ? [...new Set(raw.leadHours.map(Number).filter((h) => Number.isFinite(h) && h > 0 && h <= 168))].sort((a, b) => b - a)
-    : DEFAULT_DEADLINE_SETTINGS.leadHours;
-
-  return {
-    notificationsEnabled: raw?.notificationsEnabled !== false,
-    leadHours: leadHours.length > 0 ? leadHours : [],
-    overdueReminder: raw?.overdueReminder !== false,
-  };
-}
-
 export async function getDeadlineSettings() {
   const stored = await load(DEADLINE_SETTINGS_KEY).catch(() => null);
-  return sanitizeSettings(stored);
+  return sanitizeDeadlineSettings(stored);
 }
 
 async function loadDeadlinesStore() {
@@ -113,60 +101,6 @@ export function updateActionBadge(items = [], now = Date.now()) {
   }
 }
 
-function mergeSinglePesuItem(existing, incoming, now) {
-  if (!existing) {
-    return {
-      ...incoming,
-      completed: false,
-      completedAt: null,
-      notes: "",
-      dismissed: false,
-      createdAt: now,
-      updatedAt: now,
-    };
-  }
-
-  const keepManualDate = existing.dueDateSource === "manual";
-  const keepExistingParsedDate = existing.dueAt != null && incoming.dueAt == null;
-  const dueAt = keepManualDate || keepExistingParsedDate ? existing.dueAt : incoming.dueAt;
-  const dueDateSource = keepManualDate
-    ? "manual"
-    : keepExistingParsedDate
-      ? existing.dueDateSource
-      : incoming.dueDateSource;
-  const hasTime = keepManualDate || keepExistingParsedDate ? existing.hasTime : incoming.hasTime;
-  const rawDateText =
-    keepManualDate || keepExistingParsedDate ? existing.rawDateText : incoming.rawDateText;
-
-  const files = incoming.files?.length > 0 ? incoming.files : existing.files || [];
-
-  const title = existing.titleEdited
-    ? existing.title
-    : files.length === 1 && files[0]?.name && !/^assignments?$/i.test(files[0].name)
-      ? files[0].name
-      : existing.title && existing.title !== existing.className && incoming.title === incoming.className
-        ? existing.title
-        : incoming.title;
-
-  return {
-    ...existing,
-    ...incoming,
-    title,
-    dueAt,
-    dueDateSource,
-    hasTime,
-    rawDateText,
-    files,
-    completed: Boolean(existing.completed),
-    completedAt: existing.completedAt || null,
-    notes: existing.notes || "",
-    dismissed: Boolean(existing.dismissed),
-    titleEdited: Boolean(existing.titleEdited),
-    createdAt: existing.createdAt || now,
-    updatedAt: now,
-  };
-}
-
 export function syncDeadlinesFromCache() {
   return withDeadlinesStoreLock(async () => {
     const [pesuData, resourcesData, userProfile, semestersData, store] = await Promise.all([
@@ -177,43 +111,13 @@ export function syncDeadlinesFromCache() {
       loadDeadlinesStore(),
     ]);
 
-    const currentSemester = resolveCurrentSemesterNumber(userProfile, semestersData);
-    const extracted = extractCachedAssignmentsFromPesuData(pesuData, resourcesData, {
-      currentSemester,
-      onlyCurrentSemester: false,
-    });
-
-    const now = Date.now();
-    let changed = false;
-
-    for (const incoming of extracted) {
-      const existing = store.items[incoming.id];
-      const merged = mergeSinglePesuItem(existing, incoming, now);
-      if (
-        !existing ||
-        existing.isCurrentSemester !== merged.isCurrentSemester ||
-        existing.assignmentCount !== merged.assignmentCount ||
-        existing.dueAt !== merged.dueAt ||
-        existing.title !== merged.title ||
-        (existing.files?.length || 0) !== (merged.files?.length || 0)
-      ) {
-        store.items[incoming.id] = merged;
-        changed = true;
-      }
-    }
-
-    // Re-evaluate current semester flag on all existing PESU items
-    if (currentSemester != null) {
-      for (const item of Object.values(store.items)) {
-        if (item?.source === "pesu" && item.semester != null) {
-          const nextIsCurrent = item.semester === currentSemester;
-          if (item.isCurrentSemester !== nextIsCurrent) {
-            item.isCurrentSemester = nextIsCurrent;
-            changed = true;
-          }
-        }
-      }
-    }
+    const changed = mergePesuDataIntoStore(
+      store,
+      pesuData,
+      resourcesData,
+      userProfile,
+      semestersData
+    );
 
     const items = changed ? await saveDeadlinesStore(store) : getVisibleDeadlinesFromStore(store);
     if (!changed) {
@@ -549,7 +453,7 @@ export async function deleteDeadlineItem(id) {
 }
 
 export async function updateDeadlineSettings(nextSettings) {
-  const sanitized = sanitizeSettings(nextSettings);
+  const sanitized = sanitizeDeadlineSettings(nextSettings);
   await save(DEADLINE_SETTINGS_KEY, sanitized);
   await scheduleNextDeadlineAlarms();
   await checkAndNotifyDeadlines();
