@@ -1,14 +1,19 @@
-import React from "react";
-import { useDispatch } from "react-redux";
+import React, { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Box, Typography, IconButton, Stack } from "@mui/material";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
+import {
+  testNotificationThunk,
+  updateDeadlineSettingsThunk,
+} from "../redux/deadlinesSlice.js";
 import theme from "../Themes/theme.jsx";
 import SettingsToggleRow from "../components/Settings/SettingsToggleRow.jsx";
 import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsEditRow from "../components/Settings/SettingsEditRow.jsx";
 import SettingsSection from "../components/Settings/SettingsSection.jsx";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
+import DeadlineSettingsDialog from "../components/Deadlines/DeadlineSettingsDialog.jsx";
 import { settingsHintSx } from "../styles/styles.js";
 import { START_PAGE_OPTIONS } from "../../src/content/startPage";
 import { MERGE_MODE_OPTIONS } from "../../src/helpers/mergeModes.js";
@@ -23,6 +28,8 @@ import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js
 
 const Settings = () => {
   const dispatch = useDispatch();
+  const [deadlineSettingsOpen, setDeadlineSettingsOpen] = useState(false);
+  const deadlineSettings = useSelector((state) => state.deadlines.settings);
   const sessionKeeper = useStoredSetting(SESSION_KEEPER_KEY, false, "Keep me signed in");
   const savedSignIn = useStoredSetting(ACADEMY_CREDENTIAL_KEY, null, "saved sign-in");
   const awaitingSignIn = sessionKeeper.ready && sessionKeeper.value === true &&
@@ -93,6 +100,15 @@ const Settings = () => {
           />
         </SettingsSection>
 
+        <SettingsSection title="Deadlines">
+          <SettingsEditRow
+            title="Assignment reminders"
+            description="Configure browser notifications and lead times for assignment due dates."
+            onClick={() => setDeadlineSettingsOpen(true)}
+            label="Configure"
+          />
+        </SettingsSection>
+
         <SettingsSection title="Downloads">
           <SettingsSelectRow
             storageKey={MERGE_MODE_KEY}
@@ -106,6 +122,14 @@ const Settings = () => {
           Sidebar and courses config have been moved to Appearance.
         </Typography>
       </Stack>
+
+      <DeadlineSettingsDialog
+        open={deadlineSettingsOpen}
+        onClose={() => setDeadlineSettingsOpen(false)}
+        settings={deadlineSettings}
+        onSaveSettings={(nextSettings) => dispatch(updateDeadlineSettingsThunk(nextSettings))}
+        onTestNotification={() => dispatch(testNotificationThunk()).unwrap()}
+      />
     </Box>
   );
 };

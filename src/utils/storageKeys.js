@@ -26,3 +26,7 @@ export const RESOURCE_CHECKED_AT_KEY = "resourceCheckedAt";
 export const RESOURCE_CHECK_RUNNING_KEY = "resourceCheckRunning";
 export const LIBRARY_PAPER_LINKS_KEY = "libraryPaperLinks";
 export const LIBRARY_PAPER_CHECKED_AT_KEY = "libraryPaperCheckedAt";
+export const DEADLINES_KEY = "assignmentDeadlines";
+export const DEADLINE_SETTINGS_KEY = "deadlineNotificationSettings";
+export const DEADLINE_NOTIFIED_KEY = "deadlineNotifiedEvents";
+export const DEADLINE_SYNC_STATUS_KEY = "deadlineSyncStatus";

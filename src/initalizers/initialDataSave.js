@@ -5,6 +5,11 @@ import { parallelBatch } from "../helpers/MiscControllers.js";
 import { probeSession } from "../helpers/academyAuth.js";
 import { checkCurrentSemesterResources, dedupeStoredResourceNotifications, isResourceCheckDue, markResourceCheckStarted } from "./resourceCheck.js";
 import {
+  handleDeadlineAlarm,
+  isDeadlineSyncDue,
+  syncDeadlinesWithAcademy
+} from "./deadlineCheck.js";
+import {
   LIBRARY_PAPER_CHECK_ALARM,
   checkLibraryPaperLinks,
   isFirstLibraryPaperCheckPending,
@@ -301,7 +306,8 @@ const fetchLocks = {
   semesters: false,
   pesuData: false,
   gpaData: false,
-  resources: false
+  resources: false,
+  deadlines: false
 };
 
 function needsPesuDataRefresh(pesuData) {
@@ -400,6 +406,13 @@ async function syncMissingData() {
       checkLibraryPaperLinks()
         .catch((err) => console.error("Error checking library paper links:", err));
     }
+
+    if (pesuData?.subjects && !fetchLocks.deadlines && await isDeadlineSyncDue()) {
+      fetchLocks.deadlines = true;
+      syncDeadlinesWithAcademy()
+        .catch((err) => console.error("Error syncing assignment deadlines:", err))
+        .finally(() => { fetchLocks.deadlines = false; });
+    }
   }
 }
 
@@ -426,6 +439,9 @@ export function initializeDataSync() {
       checkLibraryPaperLinks()
         .catch((err) => console.error("Error checking library paper links:", err));
     }
+
+    handleDeadlineAlarm(alarm)
+      .catch((err) => console.error("Error handling deadline alarm:", err));
   });
 
   // Trigger sync when user logs in
