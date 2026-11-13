@@ -9,7 +9,7 @@
   "background": {
     "service_worker": "background/background.js"
   },
-  "permissions": ["cookies", "storage", "downloads", "alarms", "notifications"],
+  "permissions": ["cookies", "storage", "downloads", "alarms", "notifications", "unlimitedStorage"],
   "host_permissions": [
     "https://www.pesuacademy.com/*",
     "https://files.pesuacademy.com/*",

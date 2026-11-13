@@ -353,7 +353,7 @@ export async function saveCustomDeadline(payload) {
       dueDateSource: payload.dueAt != null ? "manual" : "none",
       hasTime: Boolean(payload.hasTime),
       rawDateText: null,
-      files: [],
+      files: Array.isArray(payload.files) ? payload.files : [],
       completed: existing ? Boolean(existing.completed) : false,
       completedAt: existing?.completedAt || null,
       notes: (payload.notes || "").trim(),
@@ -378,9 +378,53 @@ export async function saveCustomDeadline(payload) {
 export async function updateDeadlineItem(id, patch) {
   const items = await withDeadlinesStoreLock(async () => {
     const store = await loadDeadlinesStore();
-    const existing = store.items[id];
+    let existing = store.items[id];
+
+    if (!existing && String(id).startsWith("pesu:")) {
+      const [pesuData, resourcesData, userProfile, semestersData] = await Promise.all([
+        load("pesuData").catch(() => null),
+        load(RESOURCES_KEY).catch(() => null),
+        load("userProfile").catch(() => null),
+        load("semestersData").catch(() => null),
+      ]);
+      mergePesuDataIntoStore(store, pesuData, resourcesData, userProfile, semestersData);
+      existing = store.items[id];
+    }
+
     if (!existing) {
-      throw new Error("Deadline not found");
+      if (String(id).startsWith("pesu:")) {
+        const parts = String(id).split(":");
+        existing = {
+          id,
+          source: "pesu",
+          subjectId: parts[1] || null,
+          subjectCode: "",
+          subjectName: "",
+          semester: null,
+          isCurrentSemester: true,
+          unitId: parts[2] || null,
+          unitName: "",
+          classId: parts[3] || null,
+          classNo: "",
+          className: "",
+          assignmentCount: 1,
+          title: patch.title || "Assignment",
+          dueAt: null,
+          dueDateSource: "none",
+          hasTime: false,
+          rawDateText: null,
+          files: [],
+          completed: false,
+          completedAt: null,
+          notes: "",
+          dismissed: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        store.items[id] = existing;
+      } else {
+        throw new Error("Deadline not found");
+      }
     }
 
     const dueChanged = patch.dueAt !== undefined && patch.dueAt !== existing.dueAt;
@@ -394,6 +438,9 @@ export async function updateDeadlineItem(id, patch) {
       ...(patch.subjectCode !== undefined ? { subjectCode: patch.subjectCode.trim() } : {}),
       ...(patch.subjectName !== undefined ? { subjectName: patch.subjectName.trim() } : {}),
       ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+      ...(patch.files !== undefined
+        ? { files: Array.isArray(patch.files) ? patch.files : [] }
+        : {}),
       ...(patch.dueAt !== undefined
         ? {
             dueAt: nextDueAt,
@@ -689,21 +736,33 @@ export async function scheduleNextDeadlineAlarms() {
 
 export async function downloadAssignmentFile({ url, filename, subjectId, unitId, classId, classNo }) {
   let targetUrl = url ? resolveDownloadUrl(url) : null;
-  let blob = null;
   let resolvedName = filename || "assignment.pdf";
 
   if (targetUrl) {
-    const response = await fetchPesu(targetUrl, {
-      method: "GET",
-      credentials: "include",
+    const safeName = resolvedName.replace(/[<>:"/\\|?*]/g, "_").trim() || "assignment.pdf";
+    const hasExt = /\.[a-z0-9]{2,5}$/i.test(safeName);
+    const finalName = hasExt ? safeName : `${safeName}.pdf`;
+
+    return new Promise((resolve, reject) => {
+      chrome.downloads.download(
+        {
+          url: targetUrl,
+          filename: finalName,
+          saveAs: false,
+        },
+        (downloadId) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve({ downloadId, filename: finalName });
+        }
+      );
     });
-    if (!response.ok) {
-      throw new Error(`Download failed (${response.status})`);
-    }
-    const dispositionName = parseDispositionFilename(response.headers.get("Content-Disposition") || "");
-    if (dispositionName) resolvedName = dispositionName;
-    blob = await response.blob();
-  } else if (subjectId && unitId && classId) {
+  }
+
+  let blob = null;
+  if (subjectId && unitId && classId) {
     const result = await getCourseMaterials(
       subjectId,
       unitId,
@@ -719,14 +778,27 @@ export async function downloadAssignmentFile({ url, filename, subjectId, unitId,
         throw new Error("No downloadable assignment file found");
       }
       const first = links[0];
-      const resp = await fetchPesu(resolveDownloadUrl(first.url), {
-        method: "GET",
-        credentials: "include",
+      const linkUrl = resolveDownloadUrl(first.url);
+      const safeName = (first.name || resolvedName).replace(/[<>:"/\\|?*]/g, "_").trim() || "assignment.pdf";
+      const hasExt = /\.[a-z0-9]{2,5}$/i.test(safeName);
+      const finalName = hasExt ? safeName : `${safeName}.pdf`;
+
+      return new Promise((resolve, reject) => {
+        chrome.downloads.download(
+          {
+            url: linkUrl,
+            filename: finalName,
+            saveAs: false,
+          },
+          (downloadId) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            resolve({ downloadId, filename: finalName });
+          }
+        );
       });
-      if (!resp.ok) throw new Error(`Download failed (${resp.status})`);
-      const dispositionName = parseDispositionFilename(resp.headers.get("Content-Disposition") || "");
-      resolvedName = dispositionName || first.name || resolvedName;
-      blob = await resp.blob();
     }
   }
 

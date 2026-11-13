@@ -491,12 +491,22 @@ export function extractCachedAssignmentsFromPesuData(
           }
         }
 
+        const isPlaceholder = (str) =>
+          !str ||
+          /^assignments?$/i.test(str.trim()) ||
+          /no assignments? content/i.test(str);
+
         const primaryFileTitle =
-          files.length === 1 && files[0]?.name && !/^assignments?$/i.test(files[0].name)
+          files.length === 1 && files[0]?.name && !isPlaceholder(files[0].name)
             ? files[0].name
             : null;
 
-        const title = primaryFileTitle || cls.className || "Assignment";
+        const candidateClassTitle = !isPlaceholder(cls.className) ? cls.className : null;
+
+        const title =
+          primaryFileTitle ||
+          candidateClassTitle ||
+          (unit.name ? `${unit.name} - Assignment` : "Assignment");
 
         extracted.push({
           id: buildPesuAssignmentId(subject.id, unit.id, cls.id),

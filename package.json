@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "webpack --mode development --watch",
     "build": "webpack --mode production",
-    "build:dev": "webpack --mode development"
+    "build:dev": "webpack --mode development",
+    "test": "node --test tests/**/*.test.js"
   },
   "description": "",
   "main": "index.js",

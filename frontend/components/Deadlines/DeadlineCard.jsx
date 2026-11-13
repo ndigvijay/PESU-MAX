@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Box,
+  Button,
   Checkbox,
   Chip,
   CircularProgress,
@@ -11,6 +12,8 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DownloadIcon from "@mui/icons-material/Download";
 import EditCalendarIcon from "@mui/icons-material/EditCalendar";
+import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import theme from "../../Themes/theme.jsx";
 import { checkboxSx } from "../../styles/styles.js";
@@ -27,6 +30,7 @@ const DeadlineCard = ({
   onEdit,
   onDelete,
   onDownloadFile,
+  onTrackPesuItem,
 }) => {
   const [downloading, setDownloading] = useState(false);
   const status = getDeadlineStatus(item);
@@ -34,13 +38,65 @@ const DeadlineCard = ({
   const countdown = formatDeadlineCountdown(item);
   const isPesu = item.source === "pesu";
 
+  const triggerNativeDownload = (url, filename) => {
+    const fullUrl = url.startsWith("http")
+      ? url
+      : `https://www.pesuacademy.com${url.startsWith("/") ? "" : "/"}${url}`;
+
+    const a = document.createElement("a");
+    a.href = fullUrl;
+    if (filename) a.download = filename;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (document.body.contains(a)) document.body.removeChild(a);
+    }, 150);
+  };
+
+  const handleOpenFile = (file) => {
+    if (!file) return;
+
+    if (file.dataUrl) {
+      const a = document.createElement("a");
+      a.href = file.dataUrl;
+      a.download = file.name || "document";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        if (document.body.contains(a)) document.body.removeChild(a);
+      }, 150);
+      return;
+    }
+
+    if (file.url) {
+      triggerNativeDownload(file.url, file.name);
+      return;
+    }
+
+    handleDownload(file);
+  };
+
   const handleDownload = async (file) => {
+    const targetFile = file || item.files?.[0];
+
+    if (targetFile?.dataUrl) {
+      handleOpenFile(targetFile);
+      return;
+    }
+
+    if (targetFile?.url) {
+      triggerNativeDownload(targetFile.url, targetFile.name || item.title);
+      return;
+    }
+
     if (downloading) return;
     setDownloading(true);
     try {
       await onDownloadFile({
-        url: file?.url || null,
-        filename: file?.name || item.title,
+        url: targetFile?.url || null,
+        filename: targetFile?.name || item.title,
         subjectId: item.subjectId,
         unitId: item.unitId,
         classId: item.classId,
@@ -212,6 +268,37 @@ const DeadlineCard = ({
             </Typography>
           )}
 
+          {/* Attached documents list */}
+          {Array.isArray(item.files) && item.files.length > 0 && (
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "6px" }}>
+              {item.files.map((file, idx) => (
+                <Tooltip
+                  key={file.id || file.docId || idx}
+                  title={`Click to open/download "${file.name}"`}
+                >
+                  <Chip
+                    icon={<InsertDriveFileOutlinedIcon sx={{ fontSize: "13px !important" }} />}
+                    label={file.name}
+                    size="small"
+                    onClick={() => handleOpenFile(file)}
+                    clickable
+                    sx={{
+                      height: "22px",
+                      fontSize: "10.5px",
+                      fontWeight: 500,
+                      backgroundColor: theme.colors.sunken,
+                      color: theme.colors.primary,
+                      border: `1px solid ${theme.colors.line}`,
+                      maxWidth: "100%",
+                      "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", padding: "0 6px" },
+                      "&:hover": { backgroundColor: theme.colors.secondaryLight },
+                    }}
+                  />
+                </Tooltip>
+              ))}
+            </Box>
+          )}
+
           {/* Action bar */}
           <Box
             sx={{
@@ -222,6 +309,19 @@ const DeadlineCard = ({
               marginTop: "6px",
             }}
           >
+            {isPesu && onTrackPesuItem && (
+              <Tooltip title="Track this in My Deadlines">
+                <IconButton
+                  size="small"
+                  onClick={() => onTrackPesuItem(item)}
+                  aria-label="Track in My Deadlines"
+                  sx={{ color: theme.colors.primary, padding: "4px" }}
+                >
+                  <PushPinOutlinedIcon sx={{ fontSize: "18px" }} />
+                </IconButton>
+              </Tooltip>
+            )}
+
             {isPesu && (
               <Tooltip
                 title={

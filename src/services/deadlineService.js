@@ -140,7 +140,7 @@ async function localSaveCustomDeadline(payload = {}) {
     dueDateSource: payload.dueAt != null ? "manual" : "none",
     hasTime: Boolean(payload.hasTime),
     rawDateText: null,
-    files: [],
+    files: Array.isArray(payload.files) ? payload.files : [],
     completed: existing ? Boolean(existing.completed) : false,
     completedAt: existing?.completedAt || null,
     notes: (payload.notes || "").trim(),
@@ -154,10 +154,54 @@ async function localSaveCustomDeadline(payload = {}) {
 }
 
 async function localUpdateDeadline(id, patch = {}) {
-  const { store } = await readLocalStore();
-  const existing = store.items[id];
+  const { data, store } = await readLocalStore();
+  let existing = store.items[id];
+
+  if (!existing && String(id).startsWith("pesu:")) {
+    mergePesuDataIntoStore(
+      store,
+      data.pesuData,
+      data[RESOURCES_KEY],
+      data.userProfile,
+      data.semestersData
+    );
+    existing = store.items[id];
+  }
+
   if (!existing) {
-    throw new Error("Deadline not found");
+    if (String(id).startsWith("pesu:")) {
+      const parts = String(id).split(":");
+      existing = {
+        id,
+        source: "pesu",
+        subjectId: parts[1] || null,
+        subjectCode: "",
+        subjectName: "",
+        semester: null,
+        isCurrentSemester: true,
+        unitId: parts[2] || null,
+        unitName: "",
+        classId: parts[3] || null,
+        classNo: "",
+        className: "",
+        assignmentCount: 1,
+        title: patch.title || "Assignment",
+        dueAt: null,
+        dueDateSource: "none",
+        hasTime: false,
+        rawDateText: null,
+        files: [],
+        completed: false,
+        completedAt: null,
+        notes: "",
+        dismissed: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      store.items[id] = existing;
+    } else {
+      throw new Error("Deadline not found");
+    }
   }
 
   const nextDueAt = patch.dueAt !== undefined ? patch.dueAt : existing.dueAt;
@@ -169,6 +213,9 @@ async function localUpdateDeadline(id, patch = {}) {
     ...(patch.subjectCode !== undefined ? { subjectCode: patch.subjectCode.trim() } : {}),
     ...(patch.subjectName !== undefined ? { subjectName: patch.subjectName.trim() } : {}),
     ...(patch.notes !== undefined ? { notes: patch.notes } : {}),
+    ...(patch.files !== undefined
+      ? { files: Array.isArray(patch.files) ? patch.files : [] }
+      : {}),
     ...(patch.dueAt !== undefined
       ? {
           dueAt: nextDueAt,

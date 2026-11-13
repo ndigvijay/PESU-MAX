@@ -105,6 +105,7 @@ const deadlinesSlice = createSlice({
       lastSyncedAt: null,
       lastError: null,
     },
+    sourceFilter: "all",
     filter: "active",
     search: "",
     showAllSemesters: false,
@@ -116,6 +117,9 @@ const deadlinesSlice = createSlice({
     workerWarning: null,
   },
   reducers: {
+    setDeadlineSourceFilter: (state, action) => {
+      state.sourceFilter = action.payload || "all";
+    },
     setDeadlineFilter: (state, action) => {
       state.filter = action.payload;
     },
@@ -222,6 +226,7 @@ const deadlinesSlice = createSlice({
 });
 
 export const {
+  setDeadlineSourceFilter,
   setDeadlineFilter,
   setDeadlineSearch,
   setShowAllSemesters,
@@ -230,6 +235,7 @@ export const {
 
 const selectDeadlineItems = (state) => state.deadlines.items;
 const selectShowAllSemesters = (state) => state.deadlines.showAllSemesters;
+export const selectSourceFilter = (state) => state.deadlines.sourceFilter || "all";
 
 export const selectScopedDeadlines = createSelector(
   [selectDeadlineItems, selectShowAllSemesters],
@@ -238,6 +244,20 @@ export const selectScopedDeadlines = createSelector(
     return items.filter(
       (item) => item.source === "custom" || item.isCurrentSemester !== false
     );
+  }
+);
+
+export const selectSourceCounts = createSelector(
+  [selectScopedDeadlines],
+  (items) => {
+    let all = items.length;
+    let custom = 0;
+    let pesu = 0;
+    for (const item of items) {
+      if (item.source === "custom") custom++;
+      else if (item.source === "pesu") pesu++;
+    }
+    return { all, custom, pesu };
   }
 );
 
@@ -256,11 +276,15 @@ export const selectFilteredDeadlines = createSelector(
     selectScopedDeadlines,
     (state) => state.deadlines.filter,
     (state) => state.deadlines.search,
+    selectSourceFilter,
   ],
-  (items, filter, search) => {
+  (items, filter, search, sourceFilter) => {
     const query = (search || "").trim().toLowerCase();
 
     return items.filter((item) => {
+      if (sourceFilter === "custom" && item.source !== "custom") return false;
+      if (sourceFilter === "pesu" && item.source !== "pesu") return false;
+
       const status = getDeadlineStatus(item);
       if (filter === "active" && item.completed) return false;
       if (filter === "overdue" && status !== "overdue") return false;
@@ -269,6 +293,7 @@ export const selectFilteredDeadlines = createSelector(
       if (filter === "completed" && !item.completed) return false;
 
       if (query) {
+        const fileNames = Array.isArray(item.files) ? item.files.map((f) => f.name).join(" ") : "";
         const haystack = [
           item.title,
           item.subjectCode,
@@ -276,6 +301,7 @@ export const selectFilteredDeadlines = createSelector(
           item.unitName,
           item.className,
           item.notes,
+          fileNames,
         ]
           .filter(Boolean)
           .join(" ")

@@ -20,7 +20,9 @@ import AddIcon from "@mui/icons-material/Add";
 import ClearIcon from "@mui/icons-material/Clear";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
 import NotificationsActiveOutlinedIcon from "@mui/icons-material/NotificationsActiveOutlined";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import SchoolOutlinedIcon from "@mui/icons-material/SchoolOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import { setCurrentPage } from "../redux/sidebarSlice.js";
 import {
@@ -29,8 +31,11 @@ import {
   selectDeadlinesSummary,
   selectFilteredDeadlines,
   selectScopedDeadlines,
+  selectSourceCounts,
+  selectSourceFilter,
   setDeadlineFilter,
   setDeadlineSearch,
+  setDeadlineSourceFilter,
   setShowAllSemesters,
   syncDeadlinesThunk,
   testNotificationThunk,
@@ -71,16 +76,25 @@ const Deadlines = () => {
   const scopedItems = useSelector(selectScopedDeadlines);
   const filteredItems = useSelector(selectFilteredDeadlines);
   const summary = useSelector(selectDeadlinesSummary);
+  const sourceFilter = useSelector(selectSourceFilter);
+  const sourceCounts = useSelector(selectSourceCounts);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dismissedWarning, setDismissedWarning] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
   const hasPastSemesterItems = useMemo(
     () => allItems.some((item) => item.source === "pesu" && item.isCurrentSemester === false),
     [allItems]
   );
+
+  const activeSourceItems = useMemo(() => {
+    if (sourceFilter === "custom") return scopedItems.filter((i) => i.source === "custom");
+    if (sourceFilter === "pesu") return scopedItems.filter((i) => i.source === "pesu");
+    return scopedItems;
+  }, [scopedItems, sourceFilter]);
 
   const filterCounts = useMemo(() => {
     let active = 0;
@@ -89,7 +103,7 @@ const Deadlines = () => {
     let needsDate = 0;
     let completed = 0;
 
-    for (const item of scopedItems) {
+    for (const item of activeSourceItems) {
       const status = getDeadlineStatus(item);
       if (item.completed) {
         completed++;
@@ -101,8 +115,8 @@ const Deadlines = () => {
       }
     }
 
-    return { active, overdue, upcoming, needsDate, completed, all: scopedItems.length };
-  }, [scopedItems]);
+    return { active, overdue, upcoming, needsDate, completed, all: activeSourceItems.length };
+  }, [activeSourceItems]);
 
   const filterTabs = [
     { id: "active", label: `Active (${filterCounts.active})` },
@@ -160,9 +174,51 @@ const Deadlines = () => {
     dispatch(deleteDeadlineThunk(id));
   };
 
+  const handleTrackPesuItem = (item) => {
+    setEditingItem({
+      id: null,
+      source: "custom",
+      title: item.title,
+      subjectId: item.subjectId,
+      subjectCode: item.subjectCode,
+      subjectName: item.subjectName,
+      semester: item.semester,
+      dueAt: item.dueAt,
+      hasTime: item.hasTime,
+      notes: item.notes || (item.className ? `From: ${item.className}` : ""),
+      files: Array.isArray(item.files) ? item.files : [],
+    });
+    setFormOpen(true);
+  };
+
   const handleDownloadFile = async (file) => {
     try {
-      const result = await downloadDeadlineFile(file);
+      if (file?.url) {
+        const fullUrl = file.url.startsWith("http")
+          ? file.url
+          : `https://www.pesuacademy.com${file.url.startsWith("/") ? "" : "/"}${file.url}`;
+        const a = document.createElement("a");
+        a.href = fullUrl;
+        if (file.filename || file.name) a.download = file.filename || file.name;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          if (document.body.contains(a)) document.body.removeChild(a);
+        }, 150);
+        setSnackbar({
+          open: true,
+          message: `Downloading ${file.filename || file.name || "assignment"}`,
+          severity: "success",
+        });
+        return;
+      }
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Download request timed out")), 15000)
+      );
+      const result = await Promise.race([downloadDeadlineFile(file), timeoutPromise]);
       setSnackbar({
         open: true,
         message: `Downloading ${result?.filename || "assignment"}`,
@@ -296,6 +352,71 @@ const Deadlines = () => {
         </Box>
       )}
 
+      {/* Top Source Switcher (Option 1) */}
+      <Box sx={{ display: "flex", gap: "6px", alignItems: "center" }}>
+        <Chip
+          label={`All (${sourceCounts.all})`}
+          size="small"
+          clickable
+          onClick={() => dispatch(setDeadlineSourceFilter("all"))}
+          sx={{
+            fontSize: "11px",
+            fontWeight: sourceFilter === "all" ? 700 : 500,
+            height: "26px",
+            backgroundColor: sourceFilter === "all" ? theme.colors.primary : theme.colors.sunken,
+            color: sourceFilter === "all" ? theme.colors.onPrimary : theme.colors.secondary,
+            border: `1px solid ${sourceFilter === "all" ? theme.colors.primary : theme.colors.line}`,
+            "&:hover": { opacity: 0.9 },
+          }}
+        />
+        <Chip
+          icon={
+            <PersonOutlineIcon
+              sx={{
+                fontSize: "15px !important",
+                color: sourceFilter === "custom" ? "inherit !important" : theme.colors.primary,
+              }}
+            />
+          }
+          label={`My Deadlines (${sourceCounts.custom})`}
+          size="small"
+          clickable
+          onClick={() => dispatch(setDeadlineSourceFilter("custom"))}
+          sx={{
+            fontSize: "11px",
+            fontWeight: sourceFilter === "custom" ? 700 : 500,
+            height: "26px",
+            backgroundColor: sourceFilter === "custom" ? theme.colors.primary : theme.colors.sunken,
+            color: sourceFilter === "custom" ? theme.colors.onPrimary : theme.colors.secondary,
+            border: `1px solid ${sourceFilter === "custom" ? theme.colors.primary : theme.colors.line}`,
+            "&:hover": { opacity: 0.9 },
+          }}
+        />
+        <Chip
+          icon={
+            <SchoolOutlinedIcon
+              sx={{
+                fontSize: "15px !important",
+                color: sourceFilter === "pesu" ? "inherit !important" : theme.colors.secondary,
+              }}
+            />
+          }
+          label={`PESU Academy (${sourceCounts.pesu})`}
+          size="small"
+          clickable
+          onClick={() => dispatch(setDeadlineSourceFilter("pesu"))}
+          sx={{
+            fontSize: "11px",
+            fontWeight: sourceFilter === "pesu" ? 700 : 500,
+            height: "26px",
+            backgroundColor: sourceFilter === "pesu" ? theme.colors.primary : theme.colors.sunken,
+            color: sourceFilter === "pesu" ? theme.colors.onPrimary : theme.colors.secondary,
+            border: `1px solid ${sourceFilter === "pesu" ? theme.colors.primary : theme.colors.line}`,
+            "&:hover": { opacity: 0.9 },
+          }}
+        />
+      </Box>
+
       {/* Search + Optional past semester toggle */}
       <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <TextField
@@ -391,8 +512,12 @@ const Deadlines = () => {
         )}
       </Box>
 
-      {workerWarning && (
-        <Alert severity="warning" sx={{ fontSize: "11.5px", padding: "2px 10px" }}>
+      {workerWarning && !dismissedWarning && (
+        <Alert
+          severity="warning"
+          onClose={() => setDismissedWarning(true)}
+          sx={{ fontSize: "11.5px", padding: "2px 10px" }}
+        >
           {workerWarning}
         </Alert>
       )}
@@ -417,7 +542,11 @@ const Deadlines = () => {
                 ? "Nothing overdue — great work!"
                 : filter === "completed"
                   ? "No completed deadlines yet."
-                  : "No deadlines in this view."}
+                  : sourceFilter === "custom"
+                    ? "No personal deadlines yet. Click + Add or click 📌 on a PESU assignment to track it here!"
+                    : sourceFilter === "pesu"
+                      ? "No PESU assignments found in this view."
+                      : "No deadlines in this view."}
           </Typography>
           <Typography sx={{ ...settingsRowDescriptionSx, fontSize: "11.5px" }}>
             PESU-MAX automatically detects assignments from your synced PESU Academy courses.
@@ -438,6 +567,7 @@ const Deadlines = () => {
                 }}
                 onDelete={handleDelete}
                 onDownloadFile={handleDownloadFile}
+                onTrackPesuItem={handleTrackPesuItem}
               />
             ))}
           </Stack>
