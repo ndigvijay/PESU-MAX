@@ -1,10 +1,11 @@
-import { createBulkDownloadZip } from './downloadHelper.js';
+import { createBulkDownloadZip, downloadNotificationFiles } from './downloadHelper.js';
 import { blobToDataUrl } from './blobEncoding.js';
 import { CONTENT_TYPE_IDS } from './pesuAPI.js';
+import { DEFAULT_MERGE_MODE } from './mergeModes.js';
 
 const DEFAULT_CONTENT_TYPES = [CONTENT_TYPE_IDS.slides];
 
-export async function handleBulkDownload(selectedItems, contentTypes, mergeOptions = {}, mergeSlides = false, mergeMode = "subject-wise", sender, sendResponse) {
+export async function handleBulkDownload(selectedItems, contentTypes, mergeOptions = {}, mergeSlides = false, mergeMode = DEFAULT_MERGE_MODE, sender, sendResponse) {
   if (!selectedItems || selectedItems.length === 0) {
     sendResponse({ error: "No items selected" });
     return;
@@ -77,5 +78,59 @@ export async function handleBulkDownload(selectedItems, contentTypes, mergeOptio
         port.disconnect();
       } catch (e) {}
     }
+  }
+}
+
+
+function triggerChromeDownload(url, filename) {
+  return new Promise((resolve, reject) => {
+    chrome.downloads.download(
+      {
+        url,
+        filename,
+        saveAs: false
+      },
+      (downloadId) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(downloadId);
+      }
+    );
+  });
+}
+
+export async function handleNotificationDownload(notification, sendResponse) {
+  if (!notification) {
+    sendResponse({ error: "No notification provided" });
+    return;
+  }
+
+  try {
+    const { files, failed } = await downloadNotificationFiles(notification);
+    let downloadedCount = 0;
+
+    for (const file of files) {
+      try {
+        const dataUrl = await blobToDataUrl(file.blob, file.mimeType || 'application/octet-stream');
+        await triggerChromeDownload(dataUrl, file.filename);
+        downloadedCount++;
+      } catch (error) {
+        failed.push({
+          name: file.filename,
+          error: error.message || "Could not save this file"
+        });
+      }
+    }
+
+    sendResponse({
+      success: true,
+      downloadedCount,
+      failedCount: failed.length,
+      failed
+    });
+  } catch (error) {
+    sendResponse({ error: error.message || "Could not download file" });
   }
 }

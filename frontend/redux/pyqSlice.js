@@ -34,9 +34,9 @@ export const loadPyqCatalog = createAsyncThunk(
 
 export const searchPyqs = createAsyncThunk(
   "pyq/searchPyqs",
-  async ({ query, year }, { rejectWithValue }) => {
+  async ({ query, year, subjectName }, { rejectWithValue }) => {
     try {
-      return await searchCoursePyqs({ query, year });
+      return await searchCoursePyqs({ query, year, subjectName });
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -55,6 +55,7 @@ export const loadMorePyqs = createAsyncThunk(
       return await loadMoreCoursePyqs({
         query: pyq.lastQuery,
         year: pyq.lastSearchYear,
+        subjectName: pyq.lastSubjectName,
         cursor: pyq.nextPageCursor
       });
     } catch (error) {
@@ -126,6 +127,7 @@ const initialState = {
   pageRequestId: null,
   lastQuery: "",
   lastSearchYear: ALL_PYQ_YEARS,
+  lastSubjectName: "",
   selectedYear: ALL_PYQ_YEARS,
   catalogLoading: false,
   searchLoading: false,
@@ -155,6 +157,7 @@ function clearSearchResults(state) {
   state.currentPage = 1;
   state.lastQuery = "";
   state.lastSearchYear = ALL_PYQ_YEARS;
+  state.lastSubjectName = "";
   state.selectedYear = ALL_PYQ_YEARS;
   state.searchError = null;
   state.loadMoreError = null;
@@ -291,6 +294,7 @@ const pyqSlice = createSlice({
         state.nextPageCursor = entry.nextCursor || null;
         state.lastQuery = action.meta.arg.query.trim();
         state.lastSearchYear = action.meta.arg.year || ALL_PYQ_YEARS;
+        state.lastSubjectName = action.meta.arg.subjectName || "";
         state.currentPage = 1;
       })
       .addCase(searchPyqs.rejected, (state, action) => {
@@ -305,6 +309,7 @@ const pyqSlice = createSlice({
         state.currentPage = 1;
         state.lastQuery = "";
         state.lastSearchYear = ALL_PYQ_YEARS;
+        state.lastSubjectName = "";
         state.searchError = action.payload;
       })
       .addCase(loadMorePyqs.pending, (state, action) => {
@@ -321,8 +326,8 @@ const pyqSlice = createSlice({
         state.loadingMore = false;
         state.loadedResults.push(...freshResults);
         state.totalResults = Math.max(page.totalResults || 0, state.loadedResults.length);
-        state.resultsComplete = !page.nextCursor || freshResults.length === 0;
-        state.nextPageCursor = state.resultsComplete ? null : page.nextCursor;
+        state.resultsComplete = !page.nextCursor;
+        state.nextPageCursor = page.nextCursor || null;
         if (state.loadedResults.length > state.currentPage * PYQ_PAGE_SIZE) {
           state.currentPage += 1;
         }

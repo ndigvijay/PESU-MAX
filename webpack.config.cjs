@@ -185,6 +185,18 @@ module.exports = (env, argv) => {
           {
             from: 'public/icons/icon128.png',
             to: 'icons/icon128.png'
+          },
+          {
+            from: 'node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf',
+            to: 'fonts/DejaVuSans.ttf'
+          },
+          {
+            from: 'node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf',
+            to: 'fonts/DejaVuSans-Bold.ttf'
+          },
+          {
+            from: 'node_modules/dejavu-fonts-ttf/LICENSE',
+            to: 'fonts/DejaVu-LICENSE.txt'
           }
         ]
       })

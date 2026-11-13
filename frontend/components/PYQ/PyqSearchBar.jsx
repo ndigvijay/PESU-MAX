@@ -10,6 +10,7 @@ import {
 } from "../../redux/pyqSlice.js";
 import theme from "../../Themes/theme.jsx";
 import { selectSx } from "../../styles/styles.js";
+import { subjectNameForCourseQuery } from "../../../src/helpers/libraryPaperLinks.js";
 import { PYQ_YEAR_OPTIONS } from "./pyqStyles.js";
 
 const CONTROL_HEIGHT = "40px";
@@ -39,7 +40,7 @@ const searchButtonSx = {
 
 const PyqSearchBar = () => {
   const dispatch = useDispatch();
-  const { searchQuery, selectedYear, lastQuery, lastSearchYear, searchLoading } = useSelector(
+  const { searchQuery, selectedYear, selectedCourse, lastQuery, lastSearchYear, searchLoading } = useSelector(
     (state) => state.pyq
   );
   const canFilterYearLocally = useSelector(selectCanFilterYearLocally);
@@ -59,7 +60,11 @@ const PyqSearchBar = () => {
       return;
     }
 
-    dispatch(searchPyqs({ query, year: selectedYear }));
+    dispatch(searchPyqs({
+      query,
+      year: selectedYear,
+      subjectName: subjectNameForCourseQuery(query, selectedCourse)
+    }));
   };
 
   const handleSearchKey = (event) => {

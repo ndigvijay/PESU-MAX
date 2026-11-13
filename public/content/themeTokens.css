@@ -12,6 +12,7 @@
   --pesu-max-ui-border: rgba(35, 58, 118, 0.2);
   --pesu-max-ui-border-strong: rgba(35, 58, 118, 0.45);
   --pesu-max-ui-outline: rgba(35, 58, 118, 0.25);
+  --pesu-max-ui-card-border: rgba(35, 58, 118, 0.2);
 
   /* Text */
   --pesu-max-ui-heading: #233a76;
@@ -117,6 +118,7 @@ html[data-pesu-max-dark] {
   --pesu-max-ui-border: #7c7c7c;
   --pesu-max-ui-border-strong: #969696;
   --pesu-max-ui-outline: #898989;
+  --pesu-max-ui-card-border: #4a4a4a;
 
   --pesu-max-ui-heading: #e5e5e5;
   --pesu-max-ui-heading-hover: #f1f1f1;

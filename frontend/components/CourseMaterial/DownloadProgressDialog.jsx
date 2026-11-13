@@ -12,6 +12,7 @@ import {
   Alert
 } from "@mui/material";
 import theme from "../../Themes/theme.jsx";
+import { DEFAULT_MERGE_MODE } from "../../../src/helpers/mergeModes.js";
 import { clearDownloadResult } from "../../redux/courseMaterialSlice.js";
 import {
   dialogPaperSx,
@@ -102,6 +103,18 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 Converting PPT/PPTX and DOC/DOCX files to PDF might take some time, please wait.
               </Typography>
             )}
+            {downloadProgress.textPdfCount > 0 && (
+              <Typography
+                variant="body2"
+                sx={{
+                  mt: 0.5,
+                  color: theme.colors.secondary,
+                  fontSize: '11px'
+                }}
+              >
+                Text only topics found: {downloadProgress.textPdfCount}, saved as PDF
+              </Typography>
+            )}
           </Box>
         )}
 
@@ -113,7 +126,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                 {mergedEntries.length > 0 && (
                   <Box sx={{ mt: 1 }}>
                     <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
-                      Created {downloadResult.stats?.totalMergedFiles || 0} {downloadResult.stats?.mergeMode || 'subject-wise'} merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
+                      Created {downloadResult.stats?.totalMergedFiles || 0} {downloadResult.stats?.mergeMode || DEFAULT_MERGE_MODE} merged PDF{downloadResult.stats?.totalMergedFiles > 1 ? 's' : ''}.
                     </Typography>
                     <Box component="ul" sx={{ mt: 0.5, pl: 2, mb: 0, color: theme.colors.onSolid, fontSize: '11px' }}>
                       {mergedEntries.map(([contentType, count]) => (
@@ -125,6 +138,18 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                         </Box>
                       ))}
                     </Box>
+                  </Box>
+                )}
+                {downloadResult.stats?.textPdfCount > 0 && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
+                      {downloadResult.stats.textPdfCount} text only topic{downloadResult.stats.textPdfCount === 1 ? '' : 's'} saved as PDF
+                    </Typography>
+                    {downloadResult.stats.textHtmlFallbackCount > 0 && (
+                      <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
+                        {downloadResult.stats.textHtmlFallbackCount} text only topic{downloadResult.stats.textHtmlFallbackCount === 1 ? '' : 's'} saved as HTML because PDF creation failed
+                      </Typography>
+                    )}
                   </Box>
                 )}
                 {downloadResult.stats?.failed > 0 && (
@@ -151,7 +176,7 @@ const DownloadProgressDialog = ({ open, onClose }) => {
                           >
                             <Typography variant="body2" sx={{ fontSize: '11px', color: theme.colors.onSolid }}>
                               {(item.subjectName && item.subjectName !== item.className)
-                                ? `${item.subjectName} – ${item.className}`
+                                ? `${item.subjectName} - ${item.className}`
                                 : (item.className || 'Unknown class')}
                             </Typography>
                             {item.error && (

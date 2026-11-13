@@ -6,6 +6,7 @@ import {
   downloadMaterials as downloadMaterialsApi
 } from "../../src/services/courseMaterialService.js";
 import { DEFAULT_MERGE_SELECTION, MERGEABLE_CONTENT_TYPE_OPTIONS } from "../constants/constants.js";
+import { DEFAULT_MERGE_MODE, MERGE_MODES, normalizeMergeMode } from "../../src/helpers/mergeModes.js";
 
 
 export const fetchPesuData = createAsyncThunk(
@@ -34,9 +35,10 @@ export const fetchSemesters = createAsyncThunk(
 
 export const downloadSelectedMaterials = createAsyncThunk(
   "courseMaterial/downloadSelectedMaterials",
-  async ({ contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION, mergeMode = "subject-wise" }, { getState, dispatch, rejectWithValue }) => {
+  async ({ contentTypes, mergeOptions = DEFAULT_MERGE_SELECTION, mergeMode = DEFAULT_MERGE_MODE }, { getState, dispatch, rejectWithValue }) => {
     try {
 
+      const normalizedMergeMode = normalizeMergeMode(mergeMode);
       const allData = await fetchAllPesuData();
       const { selectedClasses } = getState().courseMaterial;
       
@@ -77,7 +79,7 @@ export const downloadSelectedMaterials = createAsyncThunk(
         contentTypes.includes(option.id) && normalizedMergeOptions[option.key]
       );
       const mergeGroupCount = enabledMergeTypes.length > 0
-        ? new Set(selectedItems.map((item) => mergeMode === "unit-wise"
+        ? new Set(selectedItems.map((item) => normalizedMergeMode === MERGE_MODES.unit
           ? `${item.subjectId}:${item.unitId}`
           : item.subjectId)).size * enabledMergeTypes.length
         : 0;
@@ -86,7 +88,7 @@ export const downloadSelectedMaterials = createAsyncThunk(
       dispatch(setDownloadProgress({
         current: 0,
         total: totalOperations,
-        currentItem: enabledMergeTypes.length > 0 ? `Preparing ${mergeMode} merges...` : 'Starting...',
+        currentItem: enabledMergeTypes.length > 0 ? `Preparing ${normalizedMergeMode} merges...` : 'Starting...',
         status: 'downloading'
       }));
 
@@ -94,7 +96,7 @@ export const downloadSelectedMaterials = createAsyncThunk(
         selectedItems,
         contentTypes,
         normalizedMergeOptions,
-        mergeMode,
+        normalizedMergeMode,
         (progress) => dispatch(setDownloadProgress(progress))
       );
 

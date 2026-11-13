@@ -18,9 +18,10 @@ export function isPesuSessionExpiredError(error) {
 }
 
 export async function fetchPesu(url, options) {
-  const response = await fetch(url, options);
+  const { treat500AsSessionExpired = true, ...fetchOptions } = options || {};
+  const response = await fetch(url, fetchOptions);
 
-  if (response.status === 500) {
+  if (response.status === 500 && treat500AsSessionExpired) {
     chrome.storage.local.set({ [PESU_SESSION_EXPIRED_KEY]: true });
     throw new PesuSessionExpiredError();
   }
@@ -416,7 +417,8 @@ export const getCourseMaterials = async (courseId, unitId, classId, classNo, con
     const response = await fetchPesu(`${BASE_URL}/s/studentProfilePESUAdmin?${params.toString()}`, {
       method: "GET",
       credentials: "include",
-      headers
+      headers,
+      treat500AsSessionExpired: false
     });
 
     if (!response.ok) {

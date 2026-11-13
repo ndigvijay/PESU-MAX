@@ -3,13 +3,18 @@ import { PDFDocument } from 'pdf-lib';
 import {
   fetchPesu,
   getCourseMaterials,
+  getUnitClasses,
   CONTENT_TYPE_NAMES,
   CONTENT_TYPE_IDS,
   isPesuSessionExpiredError
 } from './pesuAPI.js';
-import { parseDownloadLinks, resolveDownloadUrl } from './parser.js';
+import { parseDownloadLinks, parseUnitClasses, resolveDownloadUrl } from './parser.js';
 import { parallelBatch } from './MiscControllers.js';
 import { convertMultipleOfficeBlobsToPdfWithILovePdf, isOfficeConvertibleExtension } from './ilovepdfHelper.js';
+import { load } from '../utils/storage.js';
+import { RESOURCES_KEY } from '../utils/storageKeys.js';
+import { DEFAULT_MERGE_MODE, MERGE_MODES, normalizeMergeMode } from './mergeModes.js';
+import { createTextContentFile } from './textContentPdf.js';
 
 const BASE_URL = "https://www.pesuacademy.com";
 
@@ -323,18 +328,19 @@ function getEnabledMergeContentTypes(contentTypes, mergeOptions = {}, mergeSlide
 }
 
 function buildMergeGroupKey(subjectId, unitId, contentType, mergeMode) {
-  return mergeMode === 'unit-wise'
+  return normalizeMergeMode(mergeMode) === MERGE_MODES.unit
     ? `${subjectId}:${unitId}:${contentType}`
     : `${subjectId}:${contentType}`;
 }
 
-function buildMergedContentFilePath(subjectName, subjectCode, unitName, contentTypeName, mergeMode) {
+function buildMergedContentFilePath(subjectName, subjectCode, unitName, unitId, contentTypeName, mergeMode) {
   const safeFolderName = sanitizeFilename(subjectName);
   const safeContentFolder = sanitizeFilename(contentTypeName);
-  const mergedFileName = mergeMode === 'unit-wise'
+  const unitLabel = String(unitName || '').trim() ? sanitizeFilename(unitName) : `Unit_${unitId}`;
+  const mergedFileName = normalizeMergeMode(mergeMode) === MERGE_MODES.unit
     ? (subjectCode
-      ? `${sanitizeFilename(subjectCode)}_${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`
-      : `${sanitizeFilename(unitName)}_Merged_${safeContentFolder}.pdf`)
+      ? `${sanitizeFilename(subjectCode)}_${unitLabel}_Merged_${safeContentFolder}.pdf`
+      : `${unitLabel}_Merged_${safeContentFolder}.pdf`)
     : (subjectCode
       ? `${sanitizeFilename(subjectCode)}_Merged_${safeContentFolder}.pdf`
       : `${safeFolderName}_Merged_${safeContentFolder}.pdf`);
@@ -353,6 +359,17 @@ function formatErrorMessage(error, fallbackMessage = 'Unknown error') {
   }
 
   return fallbackMessage;
+}
+
+function formatTopicErrorMessage(error) {
+  const message = formatErrorMessage(error, 'Unknown error occurred');
+  const statusMatch = message.match(/Failed to (?:fetch|load) course materials?(?: view)?:?\s*(\d{3})/i);
+
+  if (statusMatch) {
+    return `PESU Academy returned an error for this topic (HTTP ${statusMatch[1]}).`;
+  }
+
+  return message;
 }
 
 async function addFileToZip(zip, filePath, blob, extension) {
@@ -471,7 +488,15 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
       // Parse HTML to get download links
       const downloadLinks = parseDownloadLinks(result.data);
       if (downloadLinks.length === 0) {
-        return [{ success: false, error: 'No download links found in HTML' }];
+        const textFile = await createTextContentFile(result.data, {
+          name: CONTENT_TYPE_NAMES[contentType] || 'PESU_Material'
+        });
+
+        if (textFile) {
+          return [textFile];
+        }
+
+        return [{ success: false, error: 'No files or text content found for this topic.' }];
       }
 
       const downloadPromises = downloadLinks.map(async (link) => {
@@ -508,13 +533,13 @@ async function getClassMaterialFile(subjectId, unitId, classId, classNo, content
     }
 
     console.error(`Failed to get material for class ${classId}:`, error);
-    return [{ success: false, error: error.message || 'Unknown error occurred' }];
+    return [{ success: false, error: formatTopicErrorMessage(error) }];
   }
 }
 
 export async function createBulkDownloadZip(selectedItems, progressCallback, contentTypes = [2], options = {}) {
-  const { mergeOptions = {}, mergeSlides = false, mergeMode = 'subject-wise' } = options;
-  const normalizedMergeMode = mergeMode === 'unit-wise' ? 'unit-wise' : 'subject-wise';
+  const { mergeOptions = {}, mergeSlides = false, mergeMode = DEFAULT_MERGE_MODE } = options;
+  const normalizedMergeMode = normalizeMergeMode(mergeMode);
   const zip = new JSZip();
   const normalizedMergeOptions = normalizeMergeOptions(mergeOptions, mergeSlides);
   const enabledMergeContentTypes = getEnabledMergeContentTypes(contentTypes, normalizedMergeOptions);
@@ -531,8 +556,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
             subjectId: item.subjectId,
             subjectCode: item.subjectCode,
             subjectName: item.subjectName,
-            unitId: normalizedMergeMode === 'unit-wise' ? item.unitId : null,
-            unitName: normalizedMergeMode === 'unit-wise' ? item.unitName : null,
+            unitId: normalizedMergeMode === MERGE_MODES.unit ? item.unitId : null,
+            unitName: normalizedMergeMode === MERGE_MODES.unit ? item.unitName : null,
             contentType: mergeContentType.id,
             contentTypeName: mergeContentType.name,
             files: []
@@ -554,6 +579,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
     }
   }
 
+  let textPdfCount = 0;
+  let textHtmlFallbackCount = 0;
+
   const results = await parallelBatch(downloadTasks, async (task) => {
     const { item, contentType } = task;
     const { subjectId, unitId, classId, classNo, className } = item;
@@ -561,13 +589,26 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
 
     try {
       const filesArray = await getClassMaterialFile(subjectId, unitId, classId, classNo, contentType);
+      const textFile = Array.isArray(filesArray) ? filesArray.find((file) => file?.fromText) : null;
+      if (textFile) {
+        if (textFile.textFallback) {
+          textHtmlFallbackCount++;
+        } else {
+          textPdfCount++;
+        }
+      }
+
       completed++;
       if (progressCallback) {
         progressCallback({
           current: completed,
           total: totalOperations,
-          currentItem: `${className} (${contentTypeName})`,
-          status: 'downloading'
+          currentItem: textFile
+            ? `${className} (${contentTypeName}): saved text as ${textFile.textFallback ? 'HTML' : 'PDF'}`
+            : `${className} (${contentTypeName})`,
+          status: 'downloading',
+          textPdfCount,
+          textHtmlFallbackCount
         });
       }
       return { item, contentType, filesArray };
@@ -582,7 +623,9 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           current: completed,
           total: totalOperations,
           currentItem: `${className} (${contentTypeName})`,
-          status: 'downloading'
+          status: 'downloading',
+          textPdfCount,
+          textHtmlFallbackCount
         });
       }
       return { item, contentType, filesArray: [{ success: false, error: error.message }] };
@@ -873,6 +916,7 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
           subjectGroup.subjectName,
           subjectGroup.subjectCode,
           subjectGroup.unitName,
+          subjectGroup.unitId,
           subjectGroup.contentTypeName,
           normalizedMergeMode
         );
@@ -941,6 +985,8 @@ export async function createBulkDownloadZip(selectedItems, progressCallback, con
       mergeMode: normalizedMergeMode,
       duplicateSourceFilesByType,
       totalMergedFiles,
+      textPdfCount,
+      ...(textHtmlFallbackCount > 0 ? { textHtmlFallbackCount } : {}),
       contentTypes: contentTypes.map(ct => CONTENT_TYPE_NAMES[ct] || ct)
     }
   };
@@ -988,4 +1034,163 @@ export function downloadBlob(blob, filename) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+
+const EXTENSION_TO_CONTENT_TYPE = Object.entries(CONTENT_TYPE_TO_EXT).reduce((acc, [mime, ext]) => {
+  if (!acc[ext]) {
+    acc[ext] = mime;
+  }
+  return acc;
+}, {});
+
+function getExtensionFromContentType(contentType = '', fallback = '.pdf') {
+  for (const [type, ext] of Object.entries(CONTENT_TYPE_TO_EXT)) {
+    if (contentType.includes(type)) {
+      return ext;
+    }
+  }
+  return fallback;
+}
+
+function buildNotificationDownloadFilename(rawName, extension) {
+  const normalizedExt = normalizeExtension(extension) || '.pdf';
+  let baseName = String(rawName || 'PESU_Material').trim();
+  if (baseName.toLowerCase().endsWith(normalizedExt.toLowerCase())) {
+    baseName = baseName.slice(0, -normalizedExt.length);
+  }
+  const safeBase = sanitizeFilename(baseName) || 'PESU_Material';
+  return `${safeBase}${normalizedExt}`;
+}
+
+async function prepareDownloadedFile(blob, reportedExtension, rawName) {
+  const normalizedReportedExt = normalizeExtension(reportedExtension) || '.pdf';
+  const inspection = await inspectBlobFileType(blob, normalizedReportedExt);
+  const resolvedExtension = inspection.resolvedExtension || normalizedReportedExt;
+  const mimeType = EXTENSION_TO_CONTENT_TYPE[resolvedExtension] || blob.type || 'application/octet-stream';
+  const filename = buildNotificationDownloadFilename(rawName, resolvedExtension);
+
+  return {
+    blob,
+    filename,
+    mimeType
+  };
+}
+
+export async function downloadNotificationFiles(notification) {
+  const subjectId = String(notification?.subjectId || '').trim();
+  const unitId = String(notification?.unitId || '').trim();
+  const classId = String(notification?.classId || '').trim();
+  const resources = Array.isArray(notification?.resources) ? notification.resources : [];
+
+  const tasks = [];
+  for (const resource of resources) {
+    const items = Array.isArray(resource?.items) ? resource.items : [];
+    const type = Number(resource?.type);
+    const label = resource?.label || CONTENT_TYPE_NAMES[type] || 'Resource';
+
+    for (const item of items) {
+      tasks.push({ item, type, label });
+    }
+  }
+
+  if (!subjectId || !unitId || !classId || tasks.length === 0) {
+    throw new Error('This notification has no downloadable files.');
+  }
+
+  let classNoPromise = null;
+  const resolveClassNo = () => {
+    if (!classNoPromise) {
+      classNoPromise = (async () => {
+        try {
+          const storedResources = await load(RESOURCES_KEY);
+          const storedClassNo = storedResources?.subjects?.[subjectId]?.units?.[unitId]?.classes?.[classId]?.classNo;
+          if (storedClassNo != null && String(storedClassNo).trim() !== '') {
+            return String(storedClassNo).trim();
+          }
+        } catch {
+          // Fall back to the class list on PESU Academy.
+        }
+
+        try {
+          const classesHtml = await getUnitClasses(subjectId, unitId);
+          const unitClasses = classesHtml ? parseUnitClasses(classesHtml) : [];
+          const matchedClass = unitClasses.find((cls) => String(cls.id) === classId);
+
+          if (matchedClass?.classNo != null && String(matchedClass.classNo).trim() !== '') {
+            return String(matchedClass.classNo).trim();
+          }
+        } catch (error) {
+          if (isPesuSessionExpiredError(error)) {
+            throw error;
+          }
+        }
+
+        return null;
+      })();
+    }
+
+    return classNoPromise;
+  };
+
+  const results = await parallelBatch(tasks, async ({ item, type, label }) => {
+    const docId = String(item?.docId || '').trim();
+    const rawName = item?.name || label;
+
+    try {
+      if (!docId) {
+        throw new Error('Could not identify this file on PESU Academy.');
+      }
+
+      if (docId.includes(':')) {
+        const classNo = await resolveClassNo();
+        if (!classNo) {
+          throw new Error('Could not locate this class on PESU Academy.');
+        }
+
+        const result = await getCourseMaterials(subjectId, unitId, classId, classNo, type);
+        if (result?.type !== 'binary' || !result.data) {
+          throw new Error('This file is no longer available as a single download.');
+        }
+
+        return await prepareDownloadedFile(
+          result.data,
+          getExtensionFromContentType(result.contentType),
+          rawName
+        );
+      }
+
+      const downloadResult = await downloadSingleFile(
+        resolveDownloadUrl(`/Academy/s/referenceMeterials/downloadslidecoursedoc/${docId}`)
+      );
+      if (!downloadResult.success || !downloadResult.blob) {
+        throw new Error(downloadResult.error || 'Could not download this file.');
+      }
+
+      return await prepareDownloadedFile(downloadResult.blob, downloadResult.extension, rawName);
+    } catch (error) {
+      if (isPesuSessionExpiredError(error)) {
+        throw error;
+      }
+
+      return { name: rawName, error: formatErrorMessage(error, 'Could not download this file.') };
+    }
+  }, 3);
+
+  const files = [];
+  const failed = [];
+
+  for (const result of results) {
+    if (result?.error) {
+      failed.push({ name: result.name, error: result.error });
+    } else {
+      files.push(result);
+    }
+  }
+
+  if (files.length === 0) {
+    throw new Error(failed[0]?.error || 'Could not download the requested file.');
+  }
+
+  return { files, failed };
 }

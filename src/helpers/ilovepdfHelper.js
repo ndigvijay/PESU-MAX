@@ -1,6 +1,7 @@
 const ILOVE_PDF_BASE_URL = "https://www.ilovepdf.com";
 const DEFAULT_CONVERSION_CONCURRENCY = 5;
 const RETRY_DELAYS_MS = [500, 1500];
+const UPLOAD_CHUNK_SIZE_BYTES = 2 * 1024 * 1024;
 
 const OFFICE_CONVERSION_CONFIG = {
   ".ppt": {
@@ -186,38 +187,61 @@ function getWorkerServer(config) {
   return parsedUrl.origin;
 }
 
-async function uploadBlob({ workerServer, token, taskId, blob, filename }) {
+function buildUploadFormData({ filename, taskId, chunkIndex, totalChunks, chunkBlob }) {
   const formData = new FormData();
   formData.append("name", filename);
-  formData.append("chunk", "0");
-  formData.append("chunks", "1");
+  formData.append("chunk", String(chunkIndex));
+  formData.append("chunks", String(totalChunks));
   formData.append("task", taskId);
   formData.append("preview", "1");
   formData.append("pdfinfo", "0");
   formData.append("pdfforms", "0");
   formData.append("pdfresetforms", "0");
   formData.append("v", "web.0");
-  formData.append("file", blob, filename);
+  formData.append("file", chunkBlob, filename);
+  return formData;
+}
 
-  const response = await fetch(`${workerServer}/v1/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`
-    },
-    body: formData
-  });
+async function uploadBlob({ workerServer, token, taskId, blob, filename }) {
+  const totalChunks = Math.max(1, Math.ceil(blob.size / UPLOAD_CHUNK_SIZE_BYTES));
+  let finalPayload = null;
 
-  const payload = await parseResponse(response);
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    const start = chunkIndex * UPLOAD_CHUNK_SIZE_BYTES;
+    const end = Math.min(start + UPLOAD_CHUNK_SIZE_BYTES, blob.size);
+    const chunkBlob = blob.slice(start, end, blob.type);
+    const formData = buildUploadFormData({
+      filename,
+      taskId,
+      chunkIndex,
+      totalChunks,
+      chunkBlob
+    });
 
-  if (!response.ok) {
-    throw createHttpError(buildApiErrorMessage(payload, `Failed to upload file ${filename}`), response);
+    const response = await fetch(`${workerServer}/v1/upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const payload = await parseResponse(response);
+    if (!response.ok) {
+      const fallback = totalChunks === 1
+        ? `Failed to upload file ${filename}`
+        : `Failed to upload file ${filename} (part ${chunkIndex + 1} of ${totalChunks})`;
+      throw createHttpError(buildApiErrorMessage(payload, fallback), response);
+    }
+
+    finalPayload = payload;
   }
 
-  if (!payload?.server_filename) {
+  if (!finalPayload?.server_filename) {
     throw new Error(`Upload succeeded but server filename is missing for ${filename}`);
   }
 
-  return payload;
+  return finalPayload;
 }
 
 async function processFiles({ workerServer, token, taskId, uploadedFiles, outputBaseName, tool, subtool, packagedFilename }) {

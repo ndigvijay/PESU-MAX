@@ -14,6 +14,7 @@ import {
   togglePyqSelection
 } from "../../redux/pyqSlice.js";
 import theme from "../../Themes/theme.jsx";
+import { subjectNameForCourseQuery } from "../../../src/helpers/libraryPaperLinks.js";
 import PyqBulkActionBar from "./PyqBulkActionBar.jsx";
 import PyqCourseLabel from "./PyqCourseLabel.jsx";
 import PyqLoading from "./PyqLoading.jsx";
@@ -140,7 +141,11 @@ const ResultsStep = () => {
 
   const handleAlternateSearch = () => {
     dispatch(setSearchQuery(alternateSearch.query));
-    dispatch(searchPyqs({ query: alternateSearch.query, year: selectedYear }));
+    dispatch(searchPyqs({
+      query: alternateSearch.query,
+      year: selectedYear,
+      subjectName: subjectNameForCourseQuery(alternateSearch.query, selectedCourse)
+    }));
   };
 
   return (

@@ -1,8 +1,8 @@
 import { load, remove, save } from "../utils/storage.js";
 
 const TTL = 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "librarySearchCacheV3";
-const LEGACY_STORAGE_KEYS = ["librarySearchCacheV2", "libraryAuth"];
+const STORAGE_KEY = "librarySearchCacheV4";
+const LEGACY_STORAGE_KEYS = ["librarySearchCacheV3", "librarySearchCacheV2", "libraryAuth"];
 const MAX_ENTRIES = 30;
 const MAX_BYTES = 2 * 1024 * 1024;
 const pending = new Map();

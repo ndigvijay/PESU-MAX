@@ -1,6 +1,7 @@
 import React from "react";
-import { Box, IconButton, Tooltip, Typography } from "@mui/material";
+import { Box, CircularProgress, IconButton, Tooltip, Typography } from "@mui/material";
 import DoneIcon from "@mui/icons-material/Done";
+import DownloadIcon from "@mui/icons-material/Download";
 import theme from "../../Themes/theme.jsx";
 import {
   settingsRowSx,
@@ -32,8 +33,15 @@ const ResourceItems = ({ resource }) => {
   );
 };
 
-// Notification card: class, added resources and time left, mark-read action right.
-const ResourceNotificationRow = ({ notification, read, disabled, onMarkRead }) => (
+// Notification card: class, added resources and time left, mark-read and download actions right.
+const ResourceNotificationRow = ({
+  notification,
+  read,
+  disabled,
+  downloading = false,
+  onMarkRead,
+  onDownload,
+}) => (
   <Box
     sx={{
       ...settingsRowSx,
@@ -58,19 +66,49 @@ const ResourceNotificationRow = ({ notification, read, disabled, onMarkRead }) =
         {formatDetectedAt(notification.detectedAt)}
       </Typography>
     </Box>
-    {!read && (
-      <Tooltip title="Mark as read">
-        <IconButton
-          onClick={() => onMarkRead(notification.id)}
-          disabled={disabled}
-          aria-label="Mark as read"
-          size="small"
-          sx={{ color: theme.colors.primary }}
-        >
-          <DoneIcon sx={{ fontSize: "20px" }} />
-        </IconButton>
-      </Tooltip>
-    )}
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        alignSelf: "stretch",
+        gap: "4px",
+      }}
+    >
+      {!read && (
+        <Tooltip title="Mark as read">
+          <IconButton
+            onClick={() => onMarkRead(notification.id)}
+            disabled={disabled}
+            aria-label="Mark as read"
+            size="small"
+            sx={{ color: theme.colors.primary }}
+          >
+            <DoneIcon sx={{ fontSize: "20px" }} />
+          </IconButton>
+        </Tooltip>
+      )}
+      {onDownload && (
+        <Tooltip title={downloading ? "Downloading…" : "Download"}>
+          <Box component="span" sx={{ marginTop: "auto", display: "inline-flex" }}>
+            <IconButton
+              onClick={() => onDownload(notification)}
+              disabled={downloading}
+              aria-label={downloading ? "Downloading resource" : "Download resource"}
+              size="small"
+              sx={{ color: theme.colors.primary }}
+            >
+              {downloading ? (
+                <CircularProgress size={18} sx={{ color: theme.colors.primary }} />
+              ) : (
+                <DownloadIcon sx={{ fontSize: "20px" }} />
+              )}
+            </IconButton>
+          </Box>
+        </Tooltip>
+      )}
+    </Box>
   </Box>
 );
 

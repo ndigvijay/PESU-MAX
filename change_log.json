@@ -1,5 +1,22 @@
 [
   {
+    "version": "5.0.0",
+    "date": "Nov 7, 2026",
+    "feats": [
+      "Question answers, question banks and assignments that only have text now download as PDFs",
+      "New Appearance page in settings that groups theme, page, side menu and course material settings",
+      "Merge downloaded slides subject-wise or unit-wise, chosen in the merge dialog and remembered for next time",
+      "Download new resources directly from a notification"
+    ],
+    "fixes": [
+      "Duplicate resource notifications",
+      "optimized library search for pyqs",
+      "Notification downloads fetch the right file and show an error when one fails",
+      "Merge mode now applies correctly to the download count and progress",
+      "Subtler card outlines in dark mode"
+    ]
+  },
+  {
     "version": "4.3.1",
     "date": "Oct 23, 2026",
     "feats": [

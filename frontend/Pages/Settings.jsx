@@ -1,8 +1,8 @@
-import React, { useState, useSyncExternalStore } from "react";
+import React, { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Box, Typography, IconButton, Stack } from "@mui/material";
 import KeyboardBackspaceIcon from "@mui/icons-material/KeyboardBackspace";
-import { closeSidebar, setCurrentPage } from "../redux/sidebarSlice.js";
+import { setCurrentPage } from "../redux/sidebarSlice.js";
 import {
   testNotificationThunk,
   updateDeadlineSettingsThunk,
@@ -13,64 +13,30 @@ import SettingsSelectRow from "../components/Settings/SettingsSelectRow.jsx";
 import SettingsEditRow from "../components/Settings/SettingsEditRow.jsx";
 import SettingsSection from "../components/Settings/SettingsSection.jsx";
 import useStoredSetting from "../components/Settings/useStoredSetting.js";
-import MaterialColumnsDialog from "../components/CourseMaterial/MaterialColumnsDialog.jsx";
-import DockSectionsDialog from "../components/SideMenuDock/DockSectionsDialog.jsx";
 import DeadlineSettingsDialog from "../components/Deadlines/DeadlineSettingsDialog.jsx";
-import { settingsHintSx, settingsWarningSx } from "../styles/styles.js";
-import {
-  getMenuReorderSnapshot,
-  startMenuEdit,
-  subscribeToMenuReorder,
-} from "../../src/content/menuReorder";
+import { settingsHintSx } from "../styles/styles.js";
 import { START_PAGE_OPTIONS } from "../../src/content/startPage";
+import { MERGE_MODE_OPTIONS } from "../../src/helpers/mergeModes.js";
 import {
   ACADEMY_CREDENTIAL_KEY,
   BACK_NAVIGATION_KEY,
   MERGE_MODE_KEY,
   SESSION_KEEPER_KEY,
-  SIDE_MENU_DOCK_KEY,
-  SIDE_MENU_STATE_KEY,
   START_PAGE_KEY,
 } from "../../src/utils/storageKeys.js";
 import { forgetStoredCredentials } from "../../src/helpers/academyCredentials.js";
 
-const SIDE_MENU_STYLE_OPTIONS = [
-  { value: false, label: "Classic" },
-  { value: true, label: "Minimal" },
-];
-
-const MERGE_MODE_OPTIONS = [
-  { value: "subject-wise", label: "Subject-wise" },
-  { value: "unit-wise", label: "Unit-wise" },
-];
-
 const Settings = () => {
   const dispatch = useDispatch();
-  const [materialColumnsOpen, setMaterialColumnsOpen] = useState(false);
-  const [dockSectionsOpen, setDockSectionsOpen] = useState(false);
   const [deadlineSettingsOpen, setDeadlineSettingsOpen] = useState(false);
   const deadlineSettings = useSelector((state) => state.deadlines.settings);
-  const dock = useStoredSetting(SIDE_MENU_DOCK_KEY, false, "Side menu style");
-  const dockOn = dock.ready && dock.value === true;
-  const classicOn = dock.ready && dock.value !== true;
   const sessionKeeper = useStoredSetting(SESSION_KEEPER_KEY, false, "Keep me signed in");
   const savedSignIn = useStoredSetting(ACADEMY_CREDENTIAL_KEY, null, "saved sign-in");
   const awaitingSignIn = sessionKeeper.ready && sessionKeeper.value === true &&
     savedSignIn.ready && !savedSignIn.value;
-  const { canReorder, isEditing } = useSyncExternalStore(
-    subscribeToMenuReorder,
-    getMenuReorderSnapshot,
-    getMenuReorderSnapshot
-  );
 
   const handleBack = () => {
     dispatch(setCurrentPage("home"));
-  };
-
-  const handleMenuEdit = () => {
-    if (startMenuEdit()) {
-      dispatch(closeSidebar());
-    }
   };
 
   return (
@@ -99,6 +65,13 @@ const Settings = () => {
       </Box>
 
       <Stack spacing="16px">
+        <SettingsEditRow
+          title="Appearance"
+          description="Change the way PESU Academy looks"
+          onClick={() => dispatch(setCurrentPage("appearance"))}
+          label="Open"
+        />
+
         <SettingsSection title="Sign-in & navigation">
           <SettingsToggleRow
             storageKey={SESSION_KEEPER_KEY}
@@ -127,69 +100,6 @@ const Settings = () => {
           />
         </SettingsSection>
 
-        <SettingsSection title="Display">
-          <SettingsEditRow
-            title="Appearance"
-            description="Change the way PESU Academy looks"
-            onClick={() => dispatch(setCurrentPage("appearance"))}
-            label="Open"
-          />
-
-          <SettingsEditRow
-            title="Re-order material types"
-            description="Move or hide the material columns of the Course Units table."
-            onClick={() => setMaterialColumnsOpen(true)}
-          />
-
-          <SettingsSection title="Side menu" group>
-            <SettingsSelectRow
-              storageKey={SIDE_MENU_DOCK_KEY}
-              title="Side menu style"
-              description="Minimal swaps the side menu for a dock of your sections and an All sections panel."
-              options={SIDE_MENU_STYLE_OPTIONS}
-            />
-
-            {dockOn && (
-              <SettingsEditRow
-                title="Dock sections"
-                description="Pick the sections that sit in the dock."
-                onClick={() => setDockSectionsOpen(true)}
-                label="Choose"
-              />
-            )}
-
-            {classicOn && (
-              <SettingsEditRow
-                title="Re-order side menu"
-                description="Drag the side-menu into the order you want."
-                onClick={handleMenuEdit}
-                disabled={!canReorder || isEditing}
-                label={isEditing ? "Editing" : "Edit"}
-              />
-            )}
-
-            {classicOn && (
-              <SettingsToggleRow
-                storageKey={SIDE_MENU_STATE_KEY}
-                title="Keep side menu state"
-                description="Puts the side menu back the way you left it, collapsed or open."
-              />
-            )}
-
-            {classicOn && isEditing && (
-              <Typography variant="body2" sx={settingsHintSx}>
-                Edit mode is active on the page. Use Reset or the tick to lock the order in.
-              </Typography>
-            )}
-
-            {classicOn && !canReorder && (
-              <Typography variant="body2" sx={settingsWarningSx}>
-                Open your PESU Academy profile page to re-order the menu.
-              </Typography>
-            )}
-          </SettingsSection>
-        </SettingsSection>
-
         <SettingsSection title="Deadlines">
           <SettingsEditRow
             title="Assignment reminders"
@@ -199,22 +109,19 @@ const Settings = () => {
           />
         </SettingsSection>
 
-        <SettingsSection title="Advanced">
+        <SettingsSection title="Downloads">
           <SettingsSelectRow
             storageKey={MERGE_MODE_KEY}
-            title="Merge Slides"
-            description="Choose whether selected materials are merged unit-wise or subject-wise."
+            title="Default merge mode"
+            description="Groups merged PDFs per subject or per unit when downloading course materials."
             options={MERGE_MODE_OPTIONS}
           />
         </SettingsSection>
+
+        <Typography variant="body2" sx={{ ...settingsHintSx, textAlign: "center" }}>
+          Sidebar and courses config have been moved to Appearance.
+        </Typography>
       </Stack>
-
-      <MaterialColumnsDialog
-        open={materialColumnsOpen}
-        onClose={() => setMaterialColumnsOpen(false)}
-      />
-
-      <DockSectionsDialog open={dockSectionsOpen} onClose={() => setDockSectionsOpen(false)} />
 
       <DeadlineSettingsDialog
         open={deadlineSettingsOpen}
