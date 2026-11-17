@@ -297,7 +297,6 @@ export async function fetchAllGpaData() {
   }
 }
 
-// Semesters, subjects and GPA only change when a student moves semester, so they are refetched weekly.
 async function isAcademicRefreshDue(gpaData) {
   const dueAt = await load(ACADEMIC_REFRESH_DUE_AT_KEY);
   if (dueAt != null) {
@@ -338,7 +337,6 @@ async function runAcademicRefresh({ includeGpa, includeResources }) {
 
 let academicRefreshQueue = Promise.resolve();
 
-// Refreshes run one after another so a manual refetch never overlaps the weekly one.
 export function refreshAcademicData({ includeGpa = false, includeResources = false } = {}) {
   const refresh = academicRefreshQueue
     .catch(() => {})
