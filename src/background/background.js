@@ -2,7 +2,7 @@ import { handleAcademySession } from "./academySession.js";
 import { load } from "../utils/storage.js";
 import { getPESUDataPagination, getAllPESUDataNested } from "../helpers/getStorageData.js";
 import { handleBulkDownload, handleNotificationDownload } from "../helpers/downloadController.js";
-import { fetchAllPESUData, initializeDataSync } from "../initalizers/initialDataSave.js";
+import { initializeDataSync, refreshAcademicData } from "../initalizers/initialDataSave.js";
 import { getSemestersData } from "../helpers/MiscControllers.js";
 import { searchProfessors, getProfessorDetails } from "../services/pesuStaff.js";
 import { getAttendance, getSemesterGpa } from "../helpers/pesuAPI.js";
@@ -68,14 +68,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "refetchPESUData") {
-    chrome.storage.local.set({ fetchStatus: { pesuData: true } });
-
-    fetchAllPESUData()
+    refreshAcademicData({ includeResources: true })
       .then(() => sendResponse({ data: true }))
-      .catch((error) => sendResponse({ error: error.message }))
-      .finally(() => {
-        chrome.storage.local.set({ fetchStatus: { pesuData: false } });
-      });
+      .catch((error) => sendResponse({ error: error.message }));
 
     return true;
   }

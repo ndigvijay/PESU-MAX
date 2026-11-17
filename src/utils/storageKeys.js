@@ -24,5 +24,6 @@ export const RESOURCE_NOTIFICATIONS_KEY = "resourceNotifications";
 export const RESOURCE_NOTIFICATIONS_READ_KEY = "resourceNotificationsRead";
 export const RESOURCE_CHECKED_AT_KEY = "resourceCheckedAt";
 export const RESOURCE_CHECK_RUNNING_KEY = "resourceCheckRunning";
+export const ACADEMIC_REFRESH_DUE_AT_KEY = "academicDataRefreshDueAt";
 export const LIBRARY_PAPER_LINKS_KEY = "libraryPaperLinks";
 export const LIBRARY_PAPER_CHECKED_AT_KEY = "libraryPaperCheckedAt";

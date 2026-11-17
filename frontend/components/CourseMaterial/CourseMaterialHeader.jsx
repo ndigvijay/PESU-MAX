@@ -6,6 +6,7 @@ import KeyboardBackspaceIcon from '@mui/icons-material/KeyboardBackspace';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { setCurrentPage } from "../../redux/sidebarSlice.js";
+import { fetchSemesters } from "../../redux/courseMaterialSlice.js";
 import theme from "../../Themes/theme.jsx";
 import { refetchAllPesuData } from "../../../src/services/courseMaterialService.js";
 
@@ -82,12 +83,13 @@ const CourseMaterialHeader = () => {
 
     try {
       await refetchAllPesuData();
+      dispatch(fetchSemesters());
       setSnackbarMessage('Successfully refetched');
       setSnackbarSeverity('success');
       setSnackbarOpen(true);
     } catch (error) {
       console.error("Error refetching PESU data:", error);
-      setSnackbarMessage('Failed to refetch data');
+      setSnackbarMessage(error?.message || 'Failed to refetch data');
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
@@ -141,7 +143,7 @@ const CourseMaterialHeader = () => {
       >
         {isRefetching ? 'Refetching...' : 'Refetch Data'}
       </Button>
-      <Tooltip title="refresh data if some topics/courses/semesters are missing in the table">
+      <Tooltip title="Missing a semester, course or topic? Refetch to get the latest from PESU Academy.">
         <IconButton
           aria-label="Refetch data information"
           size="small"

@@ -1,4 +1,4 @@
-import { getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile, getSemesterGpa, getSemesterDetails } from "../helpers/pesuAPI.js";
+import { getAllSemesters, getCourseUnits, getUnitClasses, getUserProfile, getSemesterGpa, getSemesterDetails, isPesuSessionExpiredError } from "../helpers/pesuAPI.js";
 import { parseSemesters, parseCourseUnits, parseUnitClasses, parseUserProfile, parseGpaData, parseSemesterDetails } from "../helpers/parser.js";
 import { save, load } from "../utils/storage.js";
 import { parallelBatch } from "../helpers/MiscControllers.js";
@@ -10,7 +10,10 @@ import {
   isFirstLibraryPaperCheckPending,
   scheduleLibraryPaperCheck
 } from "./libraryPaperCheck.js";
-import { RESOURCE_CHECK_RUNNING_KEY } from "../utils/storageKeys.js";
+import { ACADEMIC_REFRESH_DUE_AT_KEY, RESOURCE_CHECK_RUNNING_KEY } from "../utils/storageKeys.js";
+
+const ACADEMIC_REFRESH_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const ACADEMIC_REFRESH_RETRY_MS = 60 * 60 * 1000;
 
 // Save user profile data in chrome ext storage
 export async function saveUserProfileData() {
@@ -39,13 +42,7 @@ export async function fetchAllPESUData() {
     const existingPESUData = await load("pesuData");
     let semesters = await load("semestersData");
     if (!semesters?.length) {
-      await fetchSemesters();
-      semesters = await load("semestersData");
-    }
-
-    if (!semesters?.length) {
-      console.error("No semesters data available");
-      return;
+      semesters = await fetchSemesters();
     }
 
     const semesterSubjects = await parallelBatch(semesters, async (semester) => {
@@ -141,6 +138,7 @@ export async function fetchAllPESUData() {
 
   } catch (err) {
     console.error("Error fetching PESU data:", err);
+    throw err;
   }
 }
 
@@ -221,27 +219,28 @@ function hasPESUDataChanged(existingPESUData, mergedPESUData) {
   }) !== JSON.stringify(mergedPESUData);
 }
 
+// An expired session returns no semester options; keep the cached list instead of overwriting it.
 export async function fetchSemesters() {
-  try {
-    const data = await getAllSemesters();
-    if (data) {
-      const semesterData = parseSemesters(data);
-      save("semestersData", semesterData);
-      console.log(`Found ${semesterData.length} semesters`);
-    }
-  } catch (err) {
-    console.error("Error fetching semesters:", err);
+  const semesterData = parseSemesters(await getAllSemesters());
+  if (semesterData.length === 0) {
+    throw new Error("PESU Academy returned no semesters");
   }
+
+  await save("semestersData", semesterData);
+  return semesterData;
 }
 
 export async function fetchAllGpaData() {
   try {
-    const semesters = await load("semestersData");
+    const [semesters, previousGpaData] = await Promise.all([load("semestersData"), load("gpaData")]);
     if (!semesters?.length) {
       console.log("No semesters data available for GPA fetch");
       return;
     }
 
+    const previousBySemesterId = new Map(
+      (previousGpaData?.semesters || []).map((entry) => [String(entry.semesterId), entry])
+    );
     const gpaResults = [];
 
     for (const sem of semesters) {
@@ -259,8 +258,12 @@ export async function fetchAllGpaData() {
           fromApi: true
         });
       } catch (err) {
+        if (isPesuSessionExpiredError(err)) {
+          throw err;
+        }
+
         console.error(`Error fetching GPA for semester ${sem.number}:`, err);
-        gpaResults.push({
+        gpaResults.push(previousBySemesterId.get(String(sem.value)) || {
           semester: sem.number,
           semesterId: sem.value,
           credits: 0,
@@ -283,14 +286,87 @@ export async function fetchAllGpaData() {
       }
     }
 
-     save("gpaData", {
-       semesters: gpaResults,
-       currentCgpa: currentCgpa,
-       fetchedAt: Date.now()
-     });
-
-   } catch (err) {
+    await save("gpaData", {
+      semesters: gpaResults,
+      currentCgpa: currentCgpa,
+      fetchedAt: Date.now()
+    });
+  } catch (err) {
     console.error("Error fetching GPA data:", err);
+    throw err;
+  }
+}
+
+// Semesters, subjects and GPA only change when a student moves semester, so they are refetched weekly.
+async function isAcademicRefreshDue(gpaData) {
+  const dueAt = await load(ACADEMIC_REFRESH_DUE_AT_KEY);
+  if (dueAt != null) {
+    return Date.now() >= dueAt;
+  }
+
+  // First run after updating: data fetched on install counts as the last refresh.
+  return !gpaData?.fetchedAt || Date.now() - gpaData.fetchedAt >= ACADEMIC_REFRESH_INTERVAL_MS;
+}
+
+async function runAcademicRefresh({ includeGpa, includeResources }) {
+  fetchLocks.semesters = true;
+  fetchLocks.pesuData = true;
+  if (includeGpa) {
+    fetchLocks.gpaData = true;
+  }
+  await save("fetchStatus", { pesuData: true, gpaData: includeGpa });
+
+  try {
+    await fetchSemesters();
+    await fetchAllPESUData();
+    if (includeGpa) {
+      await fetchAllGpaData();
+    }
+    if (includeResources) {
+      await markResourceCheckStarted();
+      await checkCurrentSemesterResources();
+    }
+  } finally {
+    fetchLocks.semesters = false;
+    fetchLocks.pesuData = false;
+    if (includeGpa) {
+      fetchLocks.gpaData = false;
+    }
+    await save("fetchStatus", { pesuData: false, gpaData: false });
+  }
+}
+
+let academicRefreshQueue = Promise.resolve();
+
+// Refreshes run one after another so a manual refetch never overlaps the weekly one.
+export function refreshAcademicData({ includeGpa = false, includeResources = false } = {}) {
+  const refresh = academicRefreshQueue
+    .catch(() => {})
+    .then(() => runAcademicRefresh({ includeGpa, includeResources }));
+  academicRefreshQueue = refresh;
+  return refresh;
+}
+
+async function refreshAcademicDataIfDue(gpaData) {
+  if (fetchLocks.academicRefresh || !(await isAcademicRefreshDue(gpaData))) {
+    return;
+  }
+
+  fetchLocks.academicRefresh = true;
+  try {
+    if (!(await probeSession())) {
+      return;
+    }
+
+    try {
+      await refreshAcademicData({ includeGpa: true });
+      await save(ACADEMIC_REFRESH_DUE_AT_KEY, Date.now() + ACADEMIC_REFRESH_INTERVAL_MS);
+    } catch (err) {
+      console.error("Error refreshing semester data:", err);
+      await save(ACADEMIC_REFRESH_DUE_AT_KEY, Date.now() + ACADEMIC_REFRESH_RETRY_MS);
+    }
+  } finally {
+    fetchLocks.academicRefresh = false;
   }
 }
 
@@ -301,7 +377,8 @@ const fetchLocks = {
   semesters: false,
   pesuData: false,
   gpaData: false,
-  resources: false
+  resources: false,
+  academicRefresh: false
 };
 
 function needsPesuDataRefresh(pesuData) {
@@ -355,7 +432,9 @@ async function syncMissingData() {
   if (userProfile) {
     if (!semesters?.length && !fetchLocks.semesters) {
       fetchLocks.semesters = true;
-      await fetchSemesters().finally(() => { fetchLocks.semesters = false; });
+      await fetchSemesters()
+        .catch((err) => console.error("Error fetching semesters:", err))
+        .finally(() => { fetchLocks.semesters = false; });
       semesters = await load("semestersData");
     }
 
@@ -364,7 +443,7 @@ async function syncMissingData() {
       // Save fetch status to storage so frontend can show indicator
       chrome.storage.local.set({ fetchStatus: { pesuData: true } });
       
-      fetchAllPESUData().finally(() => {
+      fetchAllPESUData().catch(() => {}).finally(() => {
         fetchLocks.pesuData = false;
         chrome.storage.local.set({ fetchStatus: { pesuData: false } });
       });
@@ -390,7 +469,7 @@ async function syncMissingData() {
       fetchLocks.gpaData = true;
       chrome.storage.local.set({ fetchStatus: { gpaData: true } });
       
-      fetchAllGpaData().finally(() => {
+      fetchAllGpaData().catch(() => {}).finally(() => {
         fetchLocks.gpaData = false;
         chrome.storage.local.set({ fetchStatus: { gpaData: false } });
       });
@@ -399,6 +478,11 @@ async function syncMissingData() {
     if (pesuData?.subjects && await isFirstLibraryPaperCheckPending()) {
       checkLibraryPaperLinks()
         .catch((err) => console.error("Error checking library paper links:", err));
+    }
+
+    if (semesters?.length && gpaData && !needsPesuDataRefresh(pesuData)) {
+      refreshAcademicDataIfDue(gpaData)
+        .catch((err) => console.error("Error scheduling semester data refresh:", err));
     }
   }
 }
